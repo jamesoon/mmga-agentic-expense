@@ -1,7 +1,11 @@
 FROM python:3.11-slim
 
-# Install system packages: curl for healthcheck
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system packages: curl for healthcheck, tesseract for Spec B rule-based baseline OCR
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl \
+      tesseract-ocr \
+      libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Build-time pip trusted hosts (workaround for SSL cert interception in Docker build)
 ENV PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org pypi.python.org"
