@@ -100,6 +100,16 @@ class Settings(BaseSettings):
     quota_submissions_per_day: int = 20
     quota_retries_per_hour: int = 5
 
+    # Spec B — evaluation harness
+    eval_judge_model: Optional[str] = None
+    eval_verifier_model: str = "anthropic/claude-haiku-4-5"
+    eval_self_consistency_runs: int = 3
+    eval_disagreement_threshold: float = 0.25
+    eval_max_playground_calls_per_min: int = 5
+    eval_max_runs_per_hour: int = 1
+    eval_max_result_json_mb: int = 10
+    eval_max_cost_usd_per_run: float = 10.0
+
     @property
     def postgres_dsn(self) -> str:
         """Build PostgreSQL connection string from individual fields."""
