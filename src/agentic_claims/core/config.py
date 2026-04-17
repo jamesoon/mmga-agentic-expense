@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # Application environment
     app_env: str = Field(..., description="Application environment (local, prod)")
-    app_version: str = Field(default="1.0.0", description="Application version number")
+    app_version: str = Field(default="1.1.0", description="Application version number — bump the patch (last digit) after every deployment")
 
     # OpenRouter configuration
     openrouter_api_key: str = Field(..., description="OpenRouter API key")

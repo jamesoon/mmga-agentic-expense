@@ -684,7 +684,21 @@ Expected: all green.
 
 - [ ] **Step 3:** Commit formatting: `style: ruff format Spec B files`.
 
-### Task 10.2: Deploy to AWS
+### Task 10.2: Bump app version (increment patch per deploy)
+
+**Files:** `src/agentic_claims/core/config.py`.
+
+Every deployment MUST bump `app_version` in `core/config.py`. Convention:
+- New feature deploy → bump minor (`1.1.0` → `1.2.0`), reset patch.
+- Hotfix / no-new-feature deploy → bump patch (`1.1.0` → `1.1.1`).
+
+- [ ] **Step 1:** Identify current value in `core/config.py` (`app_version: str = Field(default="X.Y.Z", ...)`).
+- [ ] **Step 2:** Bump patch by 1 (or minor + reset patch for a feature deploy).
+- [ ] **Step 3:** Commit: `chore(version): bump app_version to X.Y.Z+1 for deploy`.
+
+The footer at `templates/base.html:95` reads `v{{ appVersion }}` via the Jinja global injected in `web/templating.py`. After bump + deploy + restart, the live site must show the new number.
+
+### Task 10.3: Deploy to AWS
 
 - [ ] **Step 1:** Rsync migration + dataset changes:
 
