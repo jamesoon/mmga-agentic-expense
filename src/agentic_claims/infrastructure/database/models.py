@@ -5,13 +5,17 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
     String,
     Text,
+    func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -197,3 +201,51 @@ class UserQuotaUsage(Base):
     quotaDate: Mapped[date] = mapped_column(Date, primary_key=True, name="date")
     submissions: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     retries: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+
+class EvalRun(Base):
+    """Spec B — eval harness run (index row)."""
+
+    __tablename__ = "eval_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    startedAt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), name="started_at"
+    )
+    finishedAt: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, name="finished_at"
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    gitSha: Mapped[str] = mapped_column(String(40), nullable=False, name="git_sha")
+    judgeModel: Mapped[str] = mapped_column(String(100), nullable=False, name="judge_model")
+    verifierModel: Mapped[str] = mapped_column(String(100), nullable=False, name="verifier_model")
+    configJson: Mapped[dict] = mapped_column(JSONB, nullable=False, name="config_json")
+    resultsPath: Mapped[str] = mapped_column(String(500), nullable=False, name="results_path")
+    summaryJson: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, name="summary_json")
+    triggeredBy: Mapped[str] = mapped_column(String(200), nullable=False, name="triggered_by")
+
+
+class EvalJudgment(Base):
+    """Spec B — per-benchmark per-pipeline judgment row."""
+
+    __tablename__ = "eval_judgments"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    runId: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("eval_runs.id", ondelete="CASCADE"),
+        nullable=False, index=True, name="run_id",
+    )
+    benchmarkId: Mapped[str] = mapped_column(String(20), nullable=False, index=True, name="benchmark_id")
+    pipeline: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    selfConsistencyRuns: Mapped[list] = mapped_column(JSONB, nullable=False, name="self_consistency_runs")
+    consistencyScore: Mapped[float] = mapped_column(Float, nullable=False, name="consistency_score")
+    crossModalVerdict: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, name="cross_modal_verdict")
+    crossModalAgree: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, name="cross_modal_agree")
+    primaryJudgeScore: Mapped[float] = mapped_column(Float, nullable=False, name="primary_judge_score")
+    verifierJudgeScore: Mapped[float] = mapped_column(Float, nullable=False, name="verifier_judge_score")
+    verifierAgree: Mapped[bool] = mapped_column(Boolean, nullable=False, name="verifier_agree")
+    disagreementScore: Mapped[float] = mapped_column(
+        Float, nullable=False, index=True, name="disagreement_score"
+    )
+    costUsd: Mapped[float] = mapped_column(Float, nullable=False, name="cost_usd")
+    reasoningDigest: Mapped[Optional[str]] = mapped_column(Text, nullable=True, name="reasoning_digest")

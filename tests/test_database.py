@@ -11,7 +11,7 @@ from agentic_claims.infrastructure.database.models import AuditLog, Base, Claim,
 def testBaseMetadataHasAllTables():
     """Test that Base.metadata includes all expected tables."""
     table_names = set(Base.metadata.tables.keys())
-    assert table_names == {"claims", "receipts", "audit_log", "users", "user_quota_usage"}
+    assert table_names == {"claims", "receipts", "audit_log", "users", "user_quota_usage", "eval_runs", "eval_judgments"}
 
 
 def testClaimModelStructure():
@@ -184,6 +184,29 @@ def testUserQuotaUsageModelExists() -> None:
     from agentic_claims.infrastructure.database.models import UserQuotaUsage
     cols = {c.name for c in UserQuotaUsage.__table__.columns}
     assert {"user_id", "date", "submissions", "retries"} <= cols
+
+
+def testEvalRunModelExists() -> None:
+    from agentic_claims.infrastructure.database.models import EvalRun
+    cols = {c.name for c in EvalRun.__table__.columns}
+    assert {
+        "id", "started_at", "finished_at", "status", "git_sha",
+        "judge_model", "verifier_model", "config_json",
+        "results_path", "summary_json", "triggered_by",
+    } <= cols
+
+
+def testEvalJudgmentModelExists() -> None:
+    from agentic_claims.infrastructure.database.models import EvalJudgment
+    cols = {c.name for c in EvalJudgment.__table__.columns}
+    assert {
+        "id", "run_id", "benchmark_id", "pipeline",
+        "self_consistency_runs", "consistency_score",
+        "cross_modal_verdict", "cross_modal_agree",
+        "primary_judge_score", "verifier_judge_score",
+        "verifier_agree", "disagreement_score",
+        "cost_usd", "reasoning_digest",
+    } <= cols
 
 
 def testAuditLogAcceptsSpecAActions() -> None:
