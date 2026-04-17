@@ -18,6 +18,7 @@ from agentic_claims.core.logging import logEvent
 from agentic_claims.web.employeeIdContext import employeeIdVar
 from agentic_claims.web.imagePathContext import imagePathVar
 from agentic_claims.web.interruptDetection import isPausedAtInterrupt
+from agentic_claims.web.securityFirewall import sanitizeUserText
 from agentic_claims.web.session import getSessionIds
 from agentic_claims.web.sessionQueues import (
     QueueRotationSignal,
@@ -43,6 +44,13 @@ async def postMessage(
     sessionIds = getSessionIds(request)
     threadId = sessionIds["threadId"]
     claimId = sessionIds["claimId"]
+
+    # B3 prompt-injection firewall: sanitize user text before it enters any
+    # LLM prompt. Raw message is replaced by the fenced, redacted version.
+    # Matched pattern names are stashed on request.state for downstream audit.
+    sanitizedMessage, firewallPatterns = sanitizeUserText(message)
+    request.state.firewallPatterns = firewallPatterns
+    message = sanitizedMessage
 
     hasImage = False
     imageB64 = None
