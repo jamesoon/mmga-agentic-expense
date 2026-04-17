@@ -184,3 +184,25 @@ def testUserQuotaUsageModelExists() -> None:
     from agentic_claims.infrastructure.database.models import UserQuotaUsage
     cols = {c.name for c in UserQuotaUsage.__table__.columns}
     assert {"user_id", "date", "submissions", "retries"} <= cols
+
+
+def testAuditLogAcceptsSpecAActions() -> None:
+    """Spec A — audit_log.action column type must accept boundary-trip values.
+
+    If the column is free-text String/Text, this is trivially satisfied.
+    If it's an Enum, the migration must have extended it to include Spec A actions.
+    """
+    from agentic_claims.infrastructure.database.models import AuditLog
+    colType = AuditLog.__table__.c.action.type
+    typeName = type(colType).__name__.lower()
+    if "enum" in typeName:
+        values = set(getattr(colType, "enums", []) or [])
+        required = {
+            "length_cap_trip", "rate_limit_trip", "quota_trip",
+            "injection_sanitized", "coherence_failed", "cross_check_failed",
+            "hard_cap_trip", "critique_flipped", "justification_rejected",
+        }
+        assert required <= values, f"Missing Spec A values: {required - values}"
+    else:
+        # Free-text; trivially accepts any string
+        assert True
