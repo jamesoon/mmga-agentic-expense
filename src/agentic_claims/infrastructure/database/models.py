@@ -72,6 +72,9 @@ class Claim(Base):
     approvedBy: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True, name="approved_by"
     )
+    userJustification: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, name="user_justification"
+    )
 
     submissionDate: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, name="submission_date"

@@ -171,3 +171,9 @@ def testClaimAdvisorDecisionColumnType():
     approvedByCol = claims_table.columns["approved_by"]
     assert isinstance(advisorCol.type, String)
     assert isinstance(approvedByCol.type, String)
+
+
+def testClaimHasUserJustificationColumn() -> None:
+    """Spec A — claims.user_justification column added in migration 010."""
+    from agentic_claims.infrastructure.database.models import Claim
+    assert hasattr(Claim, "userJustification")
