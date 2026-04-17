@@ -59,6 +59,7 @@ class IntakeGptState(TypedDict):
     lastResolution: InterruptResolution | None
     toolTrace: dict
     protocolGuardCount: int
+    userJustification: NotRequired[str | None]
 
 
 class IntakeGptSubgraphState(TypedDict):

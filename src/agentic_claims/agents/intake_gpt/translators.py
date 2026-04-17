@@ -20,6 +20,7 @@ def buildIntakeGptInput(state: dict) -> dict[str, Any]:
         "claimNumber": state.get("claimNumber"),
         "intakeFindings": state.get("intakeFindings"),
         "dbClaimId": state.get("dbClaimId"),
+        "userJustification": state.get("userJustification"),
     }
 
 
@@ -45,6 +46,7 @@ def mergeIntakeGptResult(state: dict, result: dict) -> dict[str, Any]:
         "currencyConversion",
         "violations",
         "intakeFindings",
+        "userJustification",
     ):
         if key in result:
             merged[key] = result[key]

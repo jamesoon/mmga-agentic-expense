@@ -77,6 +77,7 @@ class IntakeGptGraphState(TypedDict):
     claimNumber: NotRequired[str | None]
     intakeFindings: NotRequired[dict | None]
     dbClaimId: NotRequired[int | None]
+    userJustification: NotRequired[str | None]
 
 
 def _defaultIntakeGptState() -> IntakeGptState:
@@ -1050,6 +1051,7 @@ async def applyToolResultsNode(state: IntakeGptGraphState) -> dict:
             else:
                 if pending.get("kind") == "policy_justification":
                     slots["justification"] = responseText
+                    updates["userJustification"] = responseText
                     intakeFindings = dict(slots.get("intakeFindings") or {})
                     if intakeFindings:
                         intakeFindings["justification"] = responseText
