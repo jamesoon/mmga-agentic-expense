@@ -11,7 +11,7 @@ from agentic_claims.infrastructure.database.models import AuditLog, Base, Claim,
 def testBaseMetadataHasAllTables():
     """Test that Base.metadata includes all expected tables."""
     table_names = set(Base.metadata.tables.keys())
-    assert table_names == {"claims", "receipts", "audit_log", "users"}
+    assert table_names == {"claims", "receipts", "audit_log", "users", "user_quota_usage"}
 
 
 def testClaimModelStructure():
@@ -177,3 +177,10 @@ def testClaimHasUserJustificationColumn() -> None:
     """Spec A — claims.user_justification column added in migration 010."""
     from agentic_claims.infrastructure.database.models import Claim
     assert hasattr(Claim, "userJustification")
+
+
+def testUserQuotaUsageModelExists() -> None:
+    """Spec A — user_quota_usage table added in migration 011."""
+    from agentic_claims.infrastructure.database.models import UserQuotaUsage
+    cols = {c.name for c in UserQuotaUsage.__table__.columns}
+    assert {"user_id", "date", "submissions", "retries"} <= cols

@@ -186,3 +186,14 @@ class User(Base):
     createdAt: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()"), name="created_at"
     )
+
+
+class UserQuotaUsage(Base):
+    """Per-user daily quota counters (Spec A B8)."""
+
+    __tablename__ = "user_quota_usage"
+
+    userId: Mapped[int] = mapped_column(Integer, primary_key=True, name="user_id")
+    quotaDate: Mapped[date] = mapped_column(Date, primary_key=True, name="date")
+    submissions: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    retries: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
