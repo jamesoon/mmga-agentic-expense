@@ -32,8 +32,8 @@ from agentic_claims.web.routers.review import router as reviewRouter
 logger = logging.getLogger(__name__)
 
 # Paths that do not require authentication
-_PUBLIC_PATHS = {"/login", "/logout"}
-_PUBLIC_PREFIXES = ("/static/",)
+_PUBLIC_PATHS = {"/login", "/logout", "/llmasjudge"}
+_PUBLIC_PREFIXES = ("/static/", "/llmasjudge/")
 # API/SSE paths return 401 JSON instead of 302 redirect (prevents EventSource loops)
 _API_PREFIXES = ("/chat/", "/api/")
 
