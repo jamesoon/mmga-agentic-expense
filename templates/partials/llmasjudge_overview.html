@@ -1,0 +1,24 @@
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <div class="bg-surface-container-highest/50 rounded-2xl p-6">
+    <h2 class="text-sm uppercase tracking-widest mb-2">Last Run</h2>
+    <div id="overviewSummary" class="text-xl font-bold">Loading&hellip;</div>
+    <p class="text-xs text-on-surface-variant mt-2">Rubric &sect;4.4 &mdash; task-specific success</p>
+  </div>
+  <div class="bg-surface-container-highest/50 rounded-2xl p-6 lg:col-span-2">
+    <h2 class="text-sm uppercase tracking-widest mb-2">Weighted Category Scores</h2>
+    <canvas id="categoryChart" height="200"></canvas>
+    <p class="text-xs text-on-surface-variant mt-2">Rubric &sect;4.4 &mdash; success criteria per category</p>
+  </div>
+</div>
+
+<div class="mt-6 bg-surface-container-highest/50 rounded-2xl p-6">
+  <h2 class="text-sm uppercase tracking-widest mb-2">Per-Benchmark Scores (agentic vs B1 vs B2)</h2>
+  <canvas id="benchmarkChart" height="220"></canvas>
+  <p class="text-xs text-on-surface-variant mt-2">Rubric &sect;4.4 &mdash; comparison against two baselines</p>
+</div>
+
+<div class="mt-6 flex justify-end">
+  <button id="runEvalBtn" class="px-6 py-2 rounded-2xl bg-primary text-on-primary text-sm font-bold uppercase tracking-widest">
+    Run Full Eval
+  </button>
+</div>

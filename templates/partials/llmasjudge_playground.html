@@ -1,0 +1,26 @@
+<form id="playgroundForm" class="space-y-4 max-w-3xl">
+  <label class="block">
+    <span class="text-xs uppercase tracking-widest">Receipt text</span>
+    <textarea name="receiptText" maxlength="5000" rows="6"
+              class="w-full rounded-xl bg-surface-container-highest/50 p-3"></textarea>
+  </label>
+  <label class="block">
+    <span class="text-xs uppercase tracking-widest">Agent verdict</span>
+    <select name="agentVerdict" class="w-full rounded-xl bg-surface-container-highest/50 p-2">
+      <option value="pass">pass</option>
+      <option value="fail">fail</option>
+      <option value="requiresReview" selected>requiresReview</option>
+      <option value="requiresManagerApproval">requiresManagerApproval</option>
+      <option value="requiresDirectorApproval">requiresDirectorApproval</option>
+    </select>
+  </label>
+  <label class="block">
+    <span class="text-xs uppercase tracking-widest">Justification</span>
+    <input name="userJustification" maxlength="500"
+           class="w-full rounded-xl bg-surface-container-highest/50 p-2" />
+  </label>
+  <button type="submit" class="px-6 py-2 rounded-2xl bg-primary text-on-primary text-sm font-bold uppercase tracking-widest">
+    Score it
+  </button>
+</form>
+<div id="playgroundResult" class="mt-6"></div>
