@@ -1,0 +1,23 @@
+# Author: jamesoon
+# Lambda container image for MCP DB server using AWS Lambda Web Adapter.
+FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 AS adapter
+
+FROM python:3.11-slim
+
+# Copy Lambda Web Adapter extension
+COPY --from=adapter /lambda-adapter /opt/extensions/lambda-adapter
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY server.py .
+
+# Lambda Web Adapter config
+ENV PORT=8000
+ENV READINESS_CHECK_PATH=/mcp
+ENV READINESS_CHECK_MIN_UNHEALTHY_STATUS=500
+ENV AWS_LWA_READINESS_CHECK_PROTOCOL=http
+
+CMD ["python", "server.py"]

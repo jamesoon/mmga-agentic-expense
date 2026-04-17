@@ -1,0 +1,24 @@
+# Lambda container image for mcp-currency using AWS Lambda Web Adapter.
+# The existing server.py runs unchanged — the adapter proxies Lambda
+# events to the FastMCP HTTP server on port 8000.
+FROM public.ecr.aws/docker/library/python:3.11-slim
+
+# Install AWS Lambda Web Adapter
+COPY --from=public.ecr.aws/awsguru/aws-lambda-web-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+
+# Web Adapter config: forward to FastMCP on port 8000
+ENV PORT=8000
+ENV AWS_LWA_READINESS_CHECK_PATH=/mcp
+ENV AWS_LWA_READINESS_CHECK_MIN_UNHEALTHY_STATUS=500
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY server.py ./
+
+# FastMCP binds to 0.0.0.0:8000 by default with FASTMCP_HOST
+ENV FASTMCP_HOST=0.0.0.0
+
+CMD ["python", "server.py"]

@@ -1,0 +1,116 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Lint
+        run: poetry run ruff check src/ tests/
+
+      - name: Run tests
+        run: poetry run pytest tests/ -v --tb=short
+
+  deploy-lambdas:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push mcp-db
+        run: |
+          docker build -t mmae-mcp-db:latest \
+            -f mcp_servers/db/Dockerfile.lambda mcp_servers/db/
+          docker tag mmae-mcp-db:latest \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-db:latest
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-db:latest
+          aws lambda update-function-code --function-name mmae-mcp-db \
+            --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-db:latest
+          aws lambda wait function-updated --function-name mmae-mcp-db
+
+      - name: Build and push mcp-currency
+        run: |
+          docker build -t mmae-mcp-currency:latest \
+            -f mcp_servers/currency/Dockerfile.lambda mcp_servers/currency/
+          docker tag mmae-mcp-currency:latest \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-currency:latest
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-currency:latest
+          aws lambda update-function-code --function-name mmae-mcp-currency \
+            --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-currency:latest
+          aws lambda wait function-updated --function-name mmae-mcp-currency
+
+      - name: Build and push mcp-email
+        run: |
+          docker build -t mmae-mcp-email:latest \
+            -f mcp_servers/email/Dockerfile.lambda mcp_servers/email/
+          docker tag mmae-mcp-email:latest \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-email:latest
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-email:latest
+          aws lambda update-function-code --function-name mmae-mcp-email \
+            --image-uri ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/mmae-mcp-email:latest
+          aws lambda wait function-updated --function-name mmae-mcp-email
+
+  deploy-ec2:
+    needs: [test, deploy-lambdas]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/mmae
+            git pull origin main
+            set -a; source .env.prod; set +a
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.prod.yml exec -T app python -m alembic upgrade head

@@ -1,0 +1,19 @@
+# Lambda container image for mcp-email using AWS Lambda Web Adapter.
+FROM public.ecr.aws/docker/library/python:3.11-slim
+
+COPY --from=public.ecr.aws/awsguru/aws-lambda-web-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+
+ENV PORT=8000
+ENV AWS_LWA_READINESS_CHECK_PATH=/mcp
+ENV AWS_LWA_READINESS_CHECK_MIN_UNHEALTHY_STATUS=500
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY server.py ./
+
+ENV FASTMCP_HOST=0.0.0.0
+
+CMD ["python", "server.py"]

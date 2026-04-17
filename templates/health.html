@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}System Health{% endblock %}
+
+{% block content %}
+<div class="h-full overflow-y-auto px-6 py-6 space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold font-manrope text-on-surface">System Health</h1>
+      <p class="text-sm text-on-surface-variant mt-1">
+        {{ health.timestamp[:19] | replace("T", " ") }} UTC &middot;
+        All checks completed in <span class="text-secondary font-semibold">{{ health.totalCheckMs }}ms</span>
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Overall status badge -->
+      {% if health.overall == "healthy" %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0a2e1a] border border-[#2dd881]/30 text-[#2dd881] text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        All Systems Operational
+      </span>
+      {% elif health.overall == "degraded" %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e1a0a] border border-[#ff6b35]/30 text-[#ff6b35] text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">warning</span>
+        Degraded
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e2a0a] border border-[#ffd700]/30 text-[#ffd700] text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">info</span>
+        Partial
+      </span>
+      {% endif %}
+      <a href="/health" class="p-2 rounded-lg hover:bg-surface-bright transition-colors text-on-surface-variant hover:text-on-surface" title="Refresh">
+        <span class="material-symbols-outlined">refresh</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- System Metrics (EC2 Load) -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    {% set sys = health.system %}
+    <!-- CPU -->
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">CPU</span>
+        <span class="material-symbols-outlined text-secondary text-xl">memory</span>
+      </div>
+      <p class="text-3xl font-bold font-manrope {% if sys.cpu.percent > 80 %}text-error{% elif sys.cpu.percent > 50 %}text-[#ffd700]{% else %}text-[#2dd881]{% endif %}">{{ sys.cpu.percent }}%</p>
+      <p class="text-xs text-on-surface-variant mt-1">{{ sys.cpu.cores }} cores &middot; Load {{ sys.cpu.loadAvg1m }}/{{ sys.cpu.loadAvg5m }}/{{ sys.cpu.loadAvg15m }}</p>
+    </div>
+    <!-- Memory -->
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Memory</span>
+        <span class="material-symbols-outlined text-secondary text-xl">memory_alt</span>
+      </div>
+      <p class="text-3xl font-bold font-manrope {% if sys.memory.percent > 85 %}text-error{% elif sys.memory.percent > 60 %}text-[#ffd700]{% else %}text-[#2dd881]{% endif %}">{{ sys.memory.percent }}%</p>
+      <p class="text-xs text-on-surface-variant mt-1">{{ sys.memory.usedGb }}GB / {{ sys.memory.totalGb }}GB</p>
+    </div>
+    <!-- Disk -->
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Disk</span>
+        <span class="material-symbols-outlined text-secondary text-xl">hard_drive</span>
+      </div>
+      <p class="text-3xl font-bold font-manrope {% if sys.disk.percent > 85 %}text-error{% elif sys.disk.percent > 60 %}text-[#ffd700]{% else %}text-[#2dd881]{% endif %}">{{ sys.disk.percent }}%</p>
+      <p class="text-xs text-on-surface-variant mt-1">{{ sys.disk.usedGb }}GB / {{ sys.disk.totalGb }}GB &middot; {{ sys.disk.freeGb }}GB free</p>
+    </div>
+    <!-- Uptime -->
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Uptime</span>
+        <span class="material-symbols-outlined text-secondary text-xl">schedule</span>
+      </div>
+      <p class="text-3xl font-bold font-manrope text-on-surface">{{ sys.uptime }}</p>
+      <p class="text-xs text-on-surface-variant mt-1">{{ sys.platform[:40] }}</p>
+    </div>
+  </div>
+
+  <!-- Component Checks -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    {% macro statusDot(s) -%}
+      {% if s == "ok" %}<span class="w-2.5 h-2.5 rounded-full bg-[#2dd881] shadow-[0_0_8px_rgba(45,216,129,0.5)]"></span>
+      {% elif s == "error" %}<span class="w-2.5 h-2.5 rounded-full bg-error shadow-[0_0_8px_rgba(255,107,107,0.5)]"></span>
+      {% else %}<span class="w-2.5 h-2.5 rounded-full bg-[#ffd700] shadow-[0_0_8px_rgba(255,215,0,0.5)]"></span>
+      {% endif %}
+    {%- endmacro %}
+
+    {% macro checkCard(title, icon, check, details) %}
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+      <div class="flex items-center gap-3 mb-4">
+        {{ statusDot(check.status) }}
+        <span class="material-symbols-outlined text-on-surface-variant">{{ icon }}</span>
+        <h3 class="text-sm font-bold font-manrope text-on-surface flex-1">{{ title }}</h3>
+        <span class="text-xs text-on-surface-variant">{{ check.latencyMs | default("—") }}ms</span>
+      </div>
+      {% if check.error is defined %}
+      <p class="text-xs text-error bg-error/10 rounded-lg px-3 py-2 break-all">{{ check.error }}</p>
+      {% endif %}
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+        {% for key, val in details.items() %}
+        <dt class="text-on-surface-variant truncate">{{ key }}</dt>
+        <dd class="text-on-surface font-medium truncate" title="{{ val }}">{{ val }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endmacro %}
+
+    <!-- Database (RDS) -->
+    {% set db = health.checks.database %}
+    {{ checkCard("PostgreSQL (RDS)", "database", db, {
+      "Version": db.version[:50] if db.version is defined else "—",
+      "Claims": db.claims | default("—"),
+      "Users": db.users | default("—"),
+      "Audit entries": db.auditEntries | default("—"),
+    }) }}
+
+    <!-- Qdrant -->
+    {% set qd = health.checks.qdrant %}
+    {{ checkCard("Qdrant Vector Store", "hub", qd, {
+      "Vectors": qd.pointsCount | default("—"),
+      "Collection": qd.collectionStatus | default("—"),
+      "Dimensions": qd.vectorSize | default("—"),
+    }) }}
+
+    <!-- OpenRouter -->
+    {% set or_ = health.checks.openrouter %}
+    {{ checkCard("OpenRouter API", "smart_toy", or_, {
+      "API Key": or_.keyPrefix | default("—"),
+      "Primary LLM": or_.primaryLlm | default("—"),
+      "Primary VLM": or_.primaryVlm | default("—"),
+      "Fallback LLM": or_.fallbackLlm | default("—"),
+    }) }}
+
+    <!-- Frankfurter -->
+    {% set fk = health.checks.frankfurter %}
+    {{ checkCard("Frankfurter Currency API", "currency_exchange", fk, {
+      "Rate": fk.sampleRate | default("—"),
+      "Date": fk.date | default("—"),
+    }) }}
+
+    <!-- MCP RAG -->
+    {% set rag = health.checks.mcpRag %}
+    {{ checkCard("MCP-RAG (Policy Search)", "search", rag, {
+      "Status": "Healthy" if rag.httpCode == 406 else rag.httpCode | default("—"),
+      "URL": rag.url | default("—"),
+    }) }}
+
+    <!-- MCP DB -->
+    {% set mdb = health.checks.mcpDb %}
+    {{ checkCard("MCP-DB (Docker)", "storage", mdb, {
+      "Status": "Healthy" if mdb.httpCode == 406 else mdb.httpCode | default("—"),
+      "URL": (mdb.url | default("—"))[:60],
+    }) }}
+
+    <!-- MCP Currency -->
+    {% set mc = health.checks.mcpCurrency %}
+    {{ checkCard("MCP-Currency (Docker)", "payments", mc, {
+      "Status": "Healthy" if mc.httpCode == 406 else mc.httpCode | default("—"),
+      "URL": (mc.url | default("—"))[:60],
+    }) }}
+
+    <!-- MCP Email -->
+    {% set me = health.checks.mcpEmail %}
+    {{ checkCard("MCP-Email (Docker)", "mail", me, {
+      "Status": "Healthy" if me.httpCode == 406 else me.httpCode | default("—"),
+      "URL": (me.url | default("—"))[:60],
+    }) }}
+
+    <!-- LangGraph -->
+    {% set lg = health.checks.langGraph %}
+    {{ checkCard("LangGraph Agent Pipeline", "account_tree", lg, {
+      "Nodes": lg.nodeCount | default("—"),
+      "Pipeline": (lg.nodes | default([])) | join(" → "),
+      "Checkpointer": lg.checkpointerPool | default("—"),
+    }) }}
+
+    <!-- Session -->
+    {% set ss = health.checks.session %}
+    {{ checkCard("Session Middleware", "lock", ss, {
+      "Authenticated": ss.authenticated | default(false),
+      "Username": ss.username | default("—"),
+      "Session keys": (ss.sessionKeys | default([])) | length,
+    }) }}
+
+  </div>
+
+  <!-- Environment Info -->
+  <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+    <h3 class="text-sm font-bold font-manrope text-on-surface mb-3">Environment</h3>
+    <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+      <dt class="text-on-surface-variant">App Env</dt>
+      <dd class="text-on-surface font-medium">{{ health.environment }}</dd>
+      <dt class="text-on-surface-variant">Python</dt>
+      <dd class="text-on-surface font-medium">{{ health.system.python }}</dd>
+      <dt class="text-on-surface-variant">Platform</dt>
+      <dd class="text-on-surface font-medium">{{ health.system.platform[:50] }}</dd>
+      <dt class="text-on-surface-variant">JSON Endpoint</dt>
+      <dd class="text-on-surface font-medium"><a href="/health/json" class="text-secondary hover:underline">/health/json</a></dd>
+    </dl>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}System Logs{% endblock %}
+
+{% block content %}
+<div class="h-full overflow-y-auto px-6 py-6 space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold font-manrope text-on-surface">System Logs</h1>
+      <p class="text-sm text-on-surface-variant mt-1">{{ timestamp }} &middot; Last 150 lines per service</p>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if totalErrors > 0 %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e0a0a] border border-error/30 text-error text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">error</span>
+        {{ totalErrors }} Error{{ "s" if totalErrors != 1 }}
+      </span>
+      {% endif %}
+      {% if totalWarnings > 0 %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e2a0a] border border-[#ffd700]/30 text-[#ffd700] text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">warning</span>
+        {{ totalWarnings }} Warning{{ "s" if totalWarnings != 1 }}
+      </span>
+      {% endif %}
+      {% if totalErrors == 0 and totalWarnings == 0 %}
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0a2e1a] border border-[#2dd881]/30 text-[#2dd881] text-sm font-bold">
+        <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        No Errors
+      </span>
+      {% endif %}
+      <a href="/logs" class="p-2 rounded-lg hover:bg-surface-bright transition-colors text-on-surface-variant hover:text-on-surface" title="Refresh">
+        <span class="material-symbols-outlined">refresh</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div x-data="{ filter: 'errors' }" class="space-y-4">
+    <div class="flex gap-2">
+      <button @click="filter = 'errors'" :class="filter === 'errors' ? 'bg-error/20 text-error border-error/40' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+        Errors ({{ totalErrors }})
+      </button>
+      <button @click="filter = 'warnings'" :class="filter === 'warnings' ? 'bg-[#ffd700]/10 text-[#ffd700] border-[#ffd700]/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+        Warnings ({{ totalWarnings }})
+      </button>
+      <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+        All Logs
+      </button>
+    </div>
+
+    <!-- Service cards -->
+    {% for service, data in logs.items() %}
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] overflow-hidden"
+         x-show="filter === 'all' || (filter === 'errors' && {{ data.errors | length }} > 0) || (filter === 'warnings' && {{ data.warnings | length }} > 0)">
+
+      <!-- Service header -->
+      <div x-data="{ open: {{ 'true' if data.errors | length > 0 else 'false' }} }" class="flex flex-col">
+        <button @click="open = !open" class="flex items-center gap-3 px-5 py-4 w-full text-left hover:bg-surface-bright/50 transition-colors">
+          {% if data.errors | length > 0 %}
+          <span class="w-2.5 h-2.5 rounded-full bg-error shadow-[0_0_8px_rgba(255,107,107,0.5)]"></span>
+          {% elif data.warnings | length > 0 %}
+          <span class="w-2.5 h-2.5 rounded-full bg-[#ffd700] shadow-[0_0_8px_rgba(255,215,0,0.5)]"></span>
+          {% else %}
+          <span class="w-2.5 h-2.5 rounded-full bg-[#2dd881] shadow-[0_0_8px_rgba(45,216,129,0.5)]"></span>
+          {% endif %}
+          <span class="text-sm font-bold font-manrope text-on-surface flex-1">{{ data.label }}</span>
+          <span class="text-xs text-on-surface-variant">
+            {{ data.errors | length }} errors &middot; {{ data.warnings | length }} warnings &middot; {{ data.totalLines }} lines
+          </span>
+          <span class="material-symbols-outlined text-on-surface-variant text-base transition-transform" :class="open && 'rotate-180'">expand_more</span>
+        </button>
+
+        <!-- Log entries -->
+        <div x-show="open" x-collapse class="border-t border-outline-variant/10">
+          <div class="max-h-[400px] overflow-y-auto">
+            {% set entries = data.errors if "errors" else data.entries %}
+
+            {# Show errors #}
+            <template x-if="filter === 'errors'">
+              <div>
+                {% for entry in data.errors %}
+                <div class="px-5 py-3 border-b border-outline-variant/5 hover:bg-error/5 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <span class="material-symbols-outlined text-error text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">error</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-error/80">ERROR</span>
+                        {% if entry.funcName %}
+                        <span class="text-[10px] text-on-surface-variant font-mono">{{ entry.loggerName }}.{{ entry.funcName }}</span>
+                        {% endif %}
+                        {% if entry.timestamp %}
+                        <span class="text-[10px] text-on-surface-variant/50">{{ entry.timestamp }}</span>
+                        {% endif %}
+                      </div>
+                      <p class="text-xs text-on-surface font-mono break-all leading-relaxed">{{ entry.message }}</p>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+                {% if data.errors | length == 0 %}
+                <div class="px-5 py-8 text-center text-on-surface-variant text-sm">No errors</div>
+                {% endif %}
+              </div>
+            </template>
+
+            {# Show warnings #}
+            <template x-if="filter === 'warnings'">
+              <div>
+                {% for entry in data.warnings %}
+                <div class="px-5 py-3 border-b border-outline-variant/5 hover:bg-[#ffd700]/5 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <span class="material-symbols-outlined text-[#ffd700] text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-[#ffd700]/80">WARN</span>
+                        {% if entry.funcName %}
+                        <span class="text-[10px] text-on-surface-variant font-mono">{{ entry.loggerName }}.{{ entry.funcName }}</span>
+                        {% endif %}
+                        {% if entry.timestamp %}
+                        <span class="text-[10px] text-on-surface-variant/50">{{ entry.timestamp }}</span>
+                        {% endif %}
+                      </div>
+                      <p class="text-xs text-on-surface font-mono break-all leading-relaxed">{{ entry.message }}</p>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+                {% if data.warnings | length == 0 %}
+                <div class="px-5 py-8 text-center text-on-surface-variant text-sm">No warnings</div>
+                {% endif %}
+              </div>
+            </template>
+
+            {# Show all #}
+            <template x-if="filter === 'all'">
+              <div>
+                {% for entry in data.entries[-50:] %}
+                <div class="px-5 py-2 border-b border-outline-variant/5 hover:bg-surface-bright/30 transition-colors">
+                  <div class="flex items-start gap-2">
+                    {% if entry.level == "ERROR" %}
+                    <span class="text-[10px] font-bold text-error w-10 shrink-0 mt-0.5">ERR</span>
+                    {% elif entry.level == "WARNING" %}
+                    <span class="text-[10px] font-bold text-[#ffd700] w-10 shrink-0 mt-0.5">WARN</span>
+                    {% else %}
+                    <span class="text-[10px] font-bold text-on-surface-variant/40 w-10 shrink-0 mt-0.5">INFO</span>
+                    {% endif %}
+                    {% if entry.timestamp %}
+                    <span class="text-[10px] text-on-surface-variant/40 font-mono w-20 shrink-0 mt-0.5">{{ entry.timestamp[11:19] }}</span>
+                    {% endif %}
+                    <p class="text-[11px] text-on-surface/70 font-mono break-all leading-relaxed">{{ entry.message[:300] }}</p>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+
+  <!-- Links -->
+  <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
+    <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+      <dt class="text-on-surface-variant">JSON Endpoint</dt>
+      <dd><a href="/logs/json" class="text-secondary hover:underline">/logs/json</a></dd>
+      <dt class="text-on-surface-variant">Health Dashboard</dt>
+      <dd><a href="/health" class="text-secondary hover:underline">/health</a></dd>
+    </dl>
+  </div>
+
+</div>
+{% endblock %}

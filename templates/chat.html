@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block title %}AI Expense Submission{% endblock %}
+{% block content %}
+<div x-data="chatState()" @stream-done.window="onStreamDone()" @message-swapped.window="onMessageSwapped()" @tool-step.window="onStepName($event.detail)" class="flex flex-col lg:flex-row h-full overflow-hidden">
+<div id="sseContainer" hx-ext="sse" sse-connect="/chat/stream" class="flex flex-col flex-1 overflow-hidden">
+<div class="flex flex-col lg:flex-row flex-1 overflow-hidden">
+<!-- Chat Interface Section -->
+<section class="flex-1 flex flex-col h-full relative border-r border-outline-variant/10 border border-secondary/20 rounded-lg">
+  <!-- Chat Header -->
+  <div class="p-6 flex items-center justify-between border-b border-outline-variant/10">
+    <div class="flex items-center gap-2">
+      <h2 class="font-headline font-bold text-primary md:hidden">Chat AI</h2>
+      <div class="intelligence-pulse" x-show="processing" x-cloak></div>
+      <span class="text-[10px] uppercase tracking-widest font-bold" :class="processing ? 'text-secondary' : 'text-outline'">
+        <span x-show="processing">Processing</span>
+        <span x-show="!processing">Ready</span>
+      </span>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="/chat/export" download
+         class="text-xs text-secondary hover:text-primary transition-colors font-bold uppercase tracking-widest flex items-center gap-1"
+         title="Download conversation as markdown">
+        <span class="material-symbols-outlined text-sm align-middle">download</span> Export
+      </a>
+      <button hx-post="/chat/reset" hx-swap="none"
+              class="text-xs text-secondary hover:text-primary transition-colors font-bold uppercase tracking-widest flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm align-middle">add_circle</span> New Claim
+      </button>
+    </div>
+  </div>
+  <!-- Chat History -->
+  <div id="chatHistory"
+       class="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 hide-scrollbar"
+       @dragover.prevent="$el.classList.add('ring-2', 'ring-secondary/50')"
+       @dragleave="$el.classList.remove('ring-2', 'ring-secondary/50')"
+       @drop.prevent="handleDrop($event)">
+    <!-- System Greeting -->
+    <div id="systemGreeting" class="flex gap-4 max-w-2xl">
+      <div class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/20">
+        <span class="material-symbols-outlined text-secondary text-sm" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+      </div>
+      <div class="space-y-2">
+        <div class="bg-surface-container-low p-4 rounded-2xl rounded-tl-none border border-outline-variant/5 shadow-xl">
+          <p class="text-on-surface text-sm leading-relaxed">
+            Good evening. I'm ready to process your expenses. You can drag and drop receipts here or simply describe the transaction.
+          </p>
+        </div>
+        <span class="text-[10px] text-outline px-1">Just now</span>
+      </div>
+    </div>
+
+    <!-- Frozen turns get inserted here by freezeTurn() -->
+
+    <!-- Thinking Panel (reused each turn, then frozen on done) -->
+    <div id="thinkingPanel" x-show="processing" class="max-w-2xl" x-cloak>
+      <div class="bg-surface-container-low/50 rounded-2xl border border-outline-variant/5 p-4">
+        <button @click="thinkingCollapsed = !thinkingCollapsed" class="flex items-center gap-2 w-full text-left">
+          <div class="intelligence-pulse" x-show="processing"></div>
+          <span x-show="processing" class="text-xs text-secondary font-bold">
+            <span x-text="activeToolName"></span>
+            <span x-show="toolDuration > 0" class="text-outline/70" x-text="'(' + toolDuration + 's)'"></span>
+          </span>
+          <span x-show="!processing" id="thinkingSummary" sse-swap="thinking-done" hx-swap="innerHTML" class="text-xs text-outline font-bold"></span>
+          <span class="material-symbols-outlined text-xs transition-transform ml-auto text-outline" :class="thinkingCollapsed ? '' : 'rotate-180'">expand_more</span>
+        </button>
+        <div x-show="!thinkingCollapsed" class="mt-3">
+          <div id="thinkingStepName" sse-swap="step-name" hx-swap="innerHTML"
+               hx-on::after-swap="window.dispatchEvent(new CustomEvent('tool-step', {detail: this.textContent}))"
+               class="hidden"></div>
+          <div id="thinkingContent" sse-swap="step-content" hx-swap="beforeend"
+               hx-on::after-swap="document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight"
+               class="text-xs text-outline/70 leading-relaxed mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token stream target (live tokens during generation) -->
+    <div id="tokenTarget" sse-swap="token" hx-swap="beforeend"
+         hx-on::after-swap="document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight"
+         class="text-on-surface text-sm leading-relaxed max-w-2xl whitespace-pre-wrap empty:hidden"></div>
+
+    <!-- Hidden thinking-start trigger — clears prior turn's thinking content AND stale interrupt prompt -->
+    <div sse-swap="thinking-start" hx-swap="innerHTML"
+         hx-on::after-swap="document.getElementById('thinkingStepName').innerHTML = ''; document.getElementById('thinkingContent').innerHTML = ''; document.getElementById('thinkingSummary').innerHTML = ''; document.getElementById('interruptTarget').innerHTML = ''"
+         class="hidden"></div>
+
+    <!-- AI Messages (accumulator — frozen into flow on done) -->
+    <div id="aiMessages" sse-swap="message" hx-swap="beforeend"
+         hx-on::after-swap="document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight; window.dispatchEvent(new CustomEvent('message-swapped'))"
+         class="space-y-6 empty:hidden"></div>
+
+    <!-- Done sentinel — triggers turn freeze -->
+    <div id="doneTarget" sse-swap="done" hx-swap="innerHTML"
+         hx-on::after-swap="window.dispatchEvent(new CustomEvent('stream-done'))" class="hidden"></div>
+
+    <!-- Interrupt target — neutral agent-bubble styling (matches partials/message_bubble.html).
+         Rationale: askHuman/policy-exception prompts are routine agent questions, not errors.
+         Source: 13-DEBUG-display-regression.md "Related issues" §1. -->
+    <div id="interruptTarget" sse-swap="interrupt" hx-swap="innerHTML"
+         hx-on::after-swap="window.dispatchEvent(new CustomEvent('stream-done'))"
+         class="max-w-2xl text-sm text-on-surface p-4 bg-surface-container-low rounded-2xl border border-outline-variant/5 shadow-xl empty:hidden"></div>
+
+    <!-- Error target -->
+    <div id="errorTarget" sse-swap="error" hx-swap="innerHTML"
+         hx-on::after-swap="if(window.showErrorToast){window.showErrorToast(this.textContent)}; window.dispatchEvent(new CustomEvent('stream-done'))"
+         class="hidden"></div>
+  </div>
+  <!-- Chat Input Area -->
+  <div class="px-6 pb-6 pt-3 md:px-8 md:pb-8 md:pt-4 bg-surface/80 backdrop-blur-md">
+    <div class="max-w-3xl mx-auto relative">
+      <!-- Image Preview -->
+      <div x-show="previewUrl" class="flex items-center gap-3 mb-3 px-2" x-cloak>
+        <img :src="previewUrl" class="w-12 h-12 rounded-lg object-cover border border-outline-variant/20">
+        <span class="text-xs text-outline" x-text="fileName"></span>
+        <button type="button" @click="previewUrl = null; fileName = null; $refs.fileInput.value = ''"
+                class="text-outline hover:text-error text-xs ml-auto">Remove</button>
+      </div>
+      <form id="chatForm"
+            hx-post="/chat/message"
+            hx-encoding="multipart/form-data"
+            hx-swap="none"
+            @submit="submitForm()">
+        <input type="file" name="receipt" accept="image/*" class="hidden"
+               x-ref="fileInput"
+               @change="handleFileSelect($event)">
+        <div class="flex items-end gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-[1.25rem] p-2 transition-all shadow-2xl">
+          <button type="button" @click="$refs.fileInput.click()"
+                  class="p-3 rounded-xl hover:bg-surface-bright text-outline hover:text-secondary transition-colors">
+            <span class="material-symbols-outlined">attach_file</span>
+          </button>
+          <textarea name="message" x-model="messageText" x-ref="messageInput"
+                    class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none outline-none text-on-surface placeholder:text-outline/50 py-3 resize-none font-body text-sm"
+                    style="outline: none !important;"
+                    placeholder="Type a message or drop files..." rows="1"
+                    @keydown.enter.prevent="if (!$event.shiftKey) $el.form.requestSubmit()"></textarea>
+          <button type="submit" :disabled="processing"
+                  class="p-3 rounded-xl bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-lg shadow-primary/20 active:scale-90 transition-transform disabled:opacity-50">
+            <span class="material-symbols-outlined">send</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<!-- Right Side: Decision Pathway -->
+<aside class="hidden xl:flex w-[420px] flex-col p-8 bg-surface-container-low shrink-0 overflow-y-auto hide-scrollbar">
+  <div id="pathwayContent" sse-swap="pathway-update" hx-swap="innerHTML">
+    {% include "partials/decision_pathway.html" %}
+  </div>
+</aside>
+</div>
+<!-- Bottom Submission Table -->
+<section class="w-full bg-surface-container-low border-t border-outline-variant/10 p-4 md:px-8 shrink-0 overflow-y-auto" style="max-height: 170px;">
+  <div id="tableContent" sse-swap="table-update" hx-swap="innerHTML"
+       class="max-w-[1440px] mx-auto">
+    {% include "partials/submission_table.html" %}
+  </div>
+</section>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>
+  .ai-markdown table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8125rem; }
+  .ai-markdown th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(222,229,255,0.15); color: var(--color-secondary, #62fae3); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ai-markdown td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(222,229,255,0.05); }
+  .ai-markdown tr:hover td { background: rgba(98,250,227,0.03); }
+  .ai-markdown p { margin: 0.5rem 0; }
+  .ai-markdown p:first-child { margin-top: 0; }
+  .ai-markdown p:last-child { margin-bottom: 0; }
+  .ai-markdown strong { color: var(--color-secondary, #62fae3); font-weight: 600; }
+  .ai-markdown code { background: rgba(222,229,255,0.08); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8125rem; }
+  .ai-markdown ul, .ai-markdown ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+  .ai-markdown li { margin: 0.25rem 0; }
+</style>
+<script>
+function chatState() {
+  return {
+    threadId: '{{ threadId }}',
+    historyStorageKey: '',
+    processing: false,
+    thinkingCollapsed: false,
+    turnDone: false,
+    previewUrl: null,
+    fileName: null,
+    messageText: '',
+    activeToolName: 'Thinking...',
+    toolDuration: 0,
+    toolTimer: null,
+
+    init() {
+      this.historyStorageKey = `claims.chat.history.${this.threadId}`;
+      this.restorePersistedHistory();
+    },
+
+    restorePersistedHistory() {
+      const savedHtml = window.localStorage ? window.localStorage.getItem(this.historyStorageKey) : null;
+      if (!savedHtml) return;
+      const thinkingPanel = document.getElementById('thinkingPanel');
+      if (thinkingPanel) {
+        thinkingPanel.insertAdjacentHTML('beforebegin', savedHtml);
+        this.renderMarkdownAndScroll();
+      }
+    },
+
+    scrollChatToBottom() {
+      const chatHistory = document.getElementById('chatHistory');
+      if (!chatHistory) return;
+      const scroll = () => {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      };
+      scroll();
+      requestAnimationFrame(() => {
+        scroll();
+        requestAnimationFrame(scroll);
+      });
+      setTimeout(scroll, 50);
+    },
+
+    persistHistory() {
+      if (!window.localStorage) return;
+      const greeting = document.getElementById('systemGreeting');
+      const thinkingPanel = document.getElementById('thinkingPanel');
+      if (!greeting || !thinkingPanel) return;
+      const parts = [];
+      let node = greeting.nextSibling;
+      while (node && node !== thinkingPanel) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const clone = node.cloneNode(true);
+          clone.querySelectorAll('img[src^="blob:"]').forEach((img) => {
+            img.setAttribute('src', '/chat/receipt-image');
+          });
+          parts.push(clone.outerHTML);
+        } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          parts.push(node.textContent);
+        }
+        node = node.nextSibling;
+      }
+      window.localStorage.setItem(this.historyStorageKey, parts.join(''));
+    },
+
+    handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        this.previewUrl = URL.createObjectURL(file);
+        this.fileName = file.name;
+      }
+    },
+
+    handleDrop(event) {
+      event.target.classList.remove('ring-2', 'ring-secondary/50');
+      const file = event.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        this.$refs.fileInput.files = dt.files;
+        this.previewUrl = URL.createObjectURL(file);
+        this.fileName = file.name;
+      }
+    },
+
+    submitForm() {
+      // Capture current state before clearing
+      const text = this.messageText;
+      const imageUrl = this.previewUrl;
+      const imageName = this.fileName;
+
+      // Show user bubble immediately
+      this.appendUserBubble(text, imageUrl, imageName);
+
+      // Set processing state
+      this.processing = true;
+      this.thinkingCollapsed = false;
+
+      // Clear Alpine state immediately (visual only)
+      this.messageText = '';
+      this.previewUrl = null;
+      this.fileName = null;
+      this.$refs.messageInput.style.height = 'auto';
+
+      // Clear DOM file input AFTER HTMX has serialized the form.
+      // HTMX processes submit synchronously, so by the time setTimeout
+      // fires the form data has already been captured and sent.
+      setTimeout(() => {
+        this.$refs.fileInput.value = '';
+      }, 0);
+      this.$nextTick(() => this.scrollChatToBottom());
+    },
+
+    onStepName(label) {
+      this.activeToolName = label;
+      this.toolDuration = 0;
+      if (this.toolTimer) clearInterval(this.toolTimer);
+      this.toolTimer = setInterval(() => { this.toolDuration++; }, 1000);
+    },
+
+    onStreamDone() {
+      this.processing = false;
+      this.thinkingCollapsed = true;
+      this.turnDone = true;
+      if (this.toolTimer) { clearInterval(this.toolTimer); this.toolTimer = null; }
+      this.activeToolName = 'Thinking...';
+      this.toolDuration = 0;
+      // Defer freeze to allow HTMX to complete pending SSE swaps
+      setTimeout(() => this.freezeTurn(), 200);
+      this.$nextTick(() => {
+        this.scrollChatToBottom();
+      });
+    },
+
+    freezeTurn() {
+      const thinkingPanel = document.getElementById('thinkingPanel');
+      const aiMessages = document.getElementById('aiMessages');
+      const interruptTarget = document.getElementById('interruptTarget');
+      const tokenTarget = document.getElementById('tokenTarget');
+      const thinkingSummary = document.getElementById('thinkingSummary');
+      const thinkingContent = document.getElementById('thinkingContent');
+      const thinkingStepName = document.getElementById('thinkingStepName');
+
+      // 1. Freeze thinking panel as a static collapsed <details> element
+      const summaryText = thinkingSummary ? thinkingSummary.textContent.trim() : '';
+      const contentHtml = thinkingContent ? thinkingContent.innerHTML.trim() : '';
+      const stepNameHtml = thinkingStepName ? thinkingStepName.innerHTML.trim() : '';
+
+      if (summaryText || contentHtml) {
+        const frozen = document.createElement('div');
+        frozen.className = 'max-w-2xl';
+        frozen.innerHTML = `
+          <details class="bg-surface-container-low/50 rounded-2xl border border-outline-variant/5 p-4">
+            <summary class="flex items-center gap-2 cursor-pointer text-xs text-outline font-bold list-none [&::-webkit-details-marker]:hidden">
+              <span class="material-symbols-outlined text-xs text-outline" style="font-size: 14px;">neurology</span>
+              ${summaryText || 'Processing complete'}
+              <span class="material-symbols-outlined text-xs ml-auto text-outline">expand_more</span>
+            </summary>
+            <div class="mt-3">
+              <div class="text-xs text-outline/70 leading-relaxed mt-1">${contentHtml}</div>
+            </div>
+          </details>`;
+        thinkingPanel.insertAdjacentElement('beforebegin', frozen);
+      }
+
+      // 2. Move AI messages out of accumulator into flow (if arrived)
+      const moved = this.moveAiMessages();
+
+      // 2b. Freeze the interrupt prompt into the transcript so policy /
+      // clarification questions remain visible on subsequent turns.
+      if (interruptTarget && interruptTarget.innerHTML.trim()) {
+        const frozenInterrupt = interruptTarget.cloneNode(true);
+        frozenInterrupt.removeAttribute('id');
+        frozenInterrupt.removeAttribute('sse-swap');
+        frozenInterrupt.removeAttribute('hx-swap');
+        frozenInterrupt.removeAttribute('hx-on::after-swap');
+        thinkingPanel.insertAdjacentElement('beforebegin', frozenInterrupt);
+      }
+
+      // 3. Clear reusable elements for next turn
+      tokenTarget.innerHTML = '';
+      if (interruptTarget) interruptTarget.innerHTML = '';
+      if (thinkingSummary) thinkingSummary.innerHTML = '';
+      if (thinkingContent) thinkingContent.innerHTML = '';
+      if (thinkingStepName) thinkingStepName.innerHTML = '';
+
+      // 4. Render markdown + scroll
+      this.renderMarkdownAndScroll();
+
+      // Only clear turnDone if we actually moved messages.
+      // If message SSE hasn't arrived yet, keep turnDone=true
+      // so onMessageSwapped() can do the move later.
+      if (moved) this.turnDone = false;
+      this.persistHistory();
+    },
+
+    moveAiMessages() {
+      const thinkingPanel = document.getElementById('thinkingPanel');
+      const aiMessages = document.getElementById('aiMessages');
+      let moved = false;
+      // Use firstElementChild (not firstChild) to skip whitespace text nodes
+      // that HTMX SSE swap may insert — insertAdjacentElement requires Element
+      let el;
+      while (aiMessages && (el = aiMessages.firstElementChild)) {
+        thinkingPanel.insertAdjacentElement('beforebegin', el);
+        moved = true;
+      }
+      // Clear any remaining text nodes
+      if (moved) aiMessages.innerHTML = '';
+      if (moved) this.persistHistory();
+      return moved;
+    },
+
+    renderMarkdownAndScroll() {
+      document.querySelectorAll('.ai-markdown:not([data-rendered])').forEach(function(el) {
+        if (typeof marked !== 'undefined') {
+          el.innerHTML = marked.parse(el.textContent);
+          el.dataset.rendered = '1';
+        }
+      });
+      this.scrollChatToBottom();
+    },
+
+    onMessageSwapped() {
+      // Called from message SSE after-swap. Renders markdown immediately.
+      // If turn already finished (done fired before message arrived),
+      // also move elements into the chat flow now.
+      document.getElementById('tokenTarget').innerHTML = '';
+      this.renderMarkdownAndScroll();
+      if (this.turnDone) {
+        this.moveAiMessages();
+        this.renderMarkdownAndScroll();
+        this.turnDone = false;
+      }
+      this.persistHistory();
+    },
+
+    appendUserBubble(text, imageUrl, imageName) {
+      const hasText = text && text.trim();
+      const hasImage = imageUrl && imageName;
+      if (!hasText && !hasImage) return;
+      let contentHtml = '';
+      if (hasImage) {
+        const escapedName = imageName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        contentHtml += `<img src="${imageUrl}" class="w-32 h-32 rounded-lg object-cover border border-outline-variant/20 mb-2" alt="${escapedName}">
+          <p class="text-[10px] text-outline">${escapedName}</p>`;
+      }
+      if (hasText) {
+        const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        contentHtml += `<p class="text-on-surface text-sm leading-relaxed whitespace-pre-wrap text-left">${escaped}</p>`;
+      }
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', hour12: true});
+      const html = `<div class="flex gap-4 max-w-2xl ml-auto flex-row-reverse">
+        <div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
+          <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">person</span>
+        </div>
+        <div class="space-y-2 text-right">
+          <div class="bg-primary/10 p-4 rounded-2xl rounded-tr-none border border-primary/10 shadow-xl">
+            ${contentHtml}
+          </div>
+          <span class="text-[10px] text-outline px-1">${timeStr}</span>
+        </div>
+      </div>`;
+      const thinkingPanel = document.getElementById('thinkingPanel');
+      if (thinkingPanel) thinkingPanel.insertAdjacentHTML('beforebegin', html);
+      this.scrollChatToBottom();
+      this.persistHistory();
+    }
+  };
+}
+</script>
+{% endblock %}
