@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -81,6 +82,23 @@ class Settings(BaseSettings):
     seq_url: str = Field(default="", description="Seq dashboard URL for documentation/reference")
     seq_password: str = Field(default="", description="Seq admin password (empty = no auth)")
     seq_ingestion_url: str = Field(default="", description="Seq CLEF ingestion endpoint URL (Docker-internal, e.g. http://seq/api/events/raw)")
+
+    # Spec A — compliance hardening
+    hard_cap_per_receipt_sgd: float = 5000.0
+    hard_cap_per_claim_sgd: float = 10000.0
+    hard_cap_per_employee_per_month_sgd: float = 20000.0
+    soft_cap_multiplier: float = 1.5
+
+    compliance_critique_enabled: bool = True
+    compliance_critique_model: Optional[str] = None   # None → fall back to openrouter_fallback_model_llm
+    compliance_critique_temperature: float = 0.0
+
+    # Spec A — abuse boundaries (B1, B8)
+    max_justification_chars: int = 500
+    max_message_chars: int = 2000
+    rate_limit_messages_per_min: int = 20
+    quota_submissions_per_day: int = 20
+    quota_retries_per_hour: int = 5
 
     @property
     def postgres_dsn(self) -> str:
