@@ -20,7 +20,10 @@ import time
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from agentic_claims.agents.compliance.critique import runSelfCritique
 from agentic_claims.agents.compliance.prompts.complianceSystemPrompt import COMPLIANCE_SYSTEM_PROMPT
+from agentic_claims.agents.compliance.rules.hardCaps import evaluateHardCaps
+from agentic_claims.agents.compliance.rules.violationClassifier import classifyViolation
 from agentic_claims.agents.intake.utils.mcpClient import mcpCallTool
 from agentic_claims.agents.shared.llmFactory import buildAgentLlm
 from agentic_claims.agents.shared.utils import extractJsonBlock
@@ -169,6 +172,53 @@ async def complianceNode(state: ClaimState) -> dict:
     )
 
     # ------------------------------------------------------------------
+    # Spec A — B5 hard-cap deterministic check + justification gating
+    # ------------------------------------------------------------------
+    claimTotalSgd = float(totalAmountSgd or 0)
+    monthlyTotalSgd = float(state.get("monthlyTotalSgd") or claimTotalSgd)
+    hardCaps = evaluateHardCaps(
+        receiptTotalSgd=float(totalAmountSgd or 0),
+        claimTotalSgd=claimTotalSgd,
+        monthlyTotalSgd=monthlyTotalSgd,
+        settings=settings,
+    )
+    abuseFlagsIn = state.get("abuseFlags") or {}
+    useJustification = bool(
+        state.get("userJustification")
+        and abuseFlagsIn.get("coherenceOk", True)
+        and abuseFlagsIn.get("crossCheckOk", True)
+    )
+    classifiedViolations = [
+        {**v, "severity": classifyViolation(v)} for v in (state.get("violations") or [])
+    ]
+
+    if hardCaps["tripped"]:
+        logEvent(
+            logger,
+            "compliance.hard_cap_trip",
+            logCategory="agent",
+            agent="compliance",
+            claimId=claimId,
+            reasons=hardCaps["reasons"],
+            message="hard cap tripped",
+        )
+        if dbClaimId is not None:
+            try:
+                await mcpCallTool(
+                    serverUrl=settings.db_mcp_url,
+                    toolName="insertAuditLog",
+                    arguments={
+                        "claimId": dbClaimId,
+                        "action": "hard_cap_trip",
+                        "newValue": json.dumps({"reasons": hardCaps["reasons"]}),
+                        "actor": "compliance_agent",
+                        "oldValue": "",
+                    },
+                )
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------
     # 2. Fetch relevant policy rules via RAG MCP
     # ------------------------------------------------------------------
     policyQuery = f"{category} expense policy spending limit approval threshold budget {merchant}"
@@ -213,6 +263,10 @@ async def complianceNode(state: ClaimState) -> dict:
         "intakeViolations": intakeViolations,
         "intakeFindings": intakeFindings,
         "currencyConversion": currencyConversion,
+        "classifiedViolations": classifiedViolations,
+        "userJustification": state.get("userJustification") if useJustification else "",
+        "abuseFlags": abuseFlagsIn,
+        "hardCaps": hardCaps,
     }
 
     evaluationPrompt = (
@@ -365,12 +419,62 @@ async def complianceNode(state: ClaimState) -> dict:
         return {
             "messages": [AIMessage(content="**Compliance Check**: ERROR — LLM unavailable. Manual review required.")],
             "complianceFindings": complianceFindings,
+            "critiqueResult": {
+                "critiqueAgrees": False,
+                "critiqueVerdict": "requiresReview",
+                "critiqueReasoning": "Critique skipped: LLM unavailable.",
+                "originalVerdict": complianceFindings.get("verdict", "error"),
+                "finalVerdict": "requiresReview",
+                "rawLlmResponse": "",
+            },
         }
 
     # ------------------------------------------------------------------
     # 5. Parse response into structured findings
     # ------------------------------------------------------------------
     complianceFindings = _parseComplianceResponse(rawContent)
+
+    # ------------------------------------------------------------------
+    # 5b. Spec A B6 — self-critique second pass
+    # ------------------------------------------------------------------
+    # If hard caps tripped, override the LLM verdict before critique so
+    # the critique sees the escalated verdict as the baseline.
+    if hardCaps["tripped"]:
+        complianceFindings["verdict"] = "requiresDirectorApproval"
+        complianceFindings["requiresDirectorApproval"] = True
+        complianceFindings["requiresReview"] = True
+
+    critique = await runSelfCritique(
+        originalVerdict=str(complianceFindings.get("verdict", "requiresReview")),
+        context={
+            "classifiedViolations": classifiedViolations,
+            "justification": state.get("userJustification") if useJustification else "",
+            "abuseFlags": abuseFlagsIn,
+            "hardCaps": hardCaps,
+            "summary": complianceFindings.get("summary", ""),
+        },
+    )
+    if not critique["critiqueAgrees"]:
+        if dbClaimId is not None:
+            try:
+                await mcpCallTool(
+                    serverUrl=settings.db_mcp_url,
+                    toolName="insertAuditLog",
+                    arguments={
+                        "claimId": dbClaimId,
+                        "action": "critique_flipped",
+                        "newValue": json.dumps({
+                            "original": critique["originalVerdict"],
+                            "final": critique["finalVerdict"],
+                            "reasoning": critique["critiqueReasoning"],
+                        }),
+                        "actor": "compliance_agent",
+                        "oldValue": "",
+                    },
+                )
+            except Exception:
+                pass
+    complianceFindings["finalVerdict"] = critique["finalVerdict"]
 
     verdict = complianceFindings.get("verdict", "unknown").upper()
     summary = complianceFindings.get("summary", "")
@@ -381,6 +485,7 @@ async def complianceNode(state: ClaimState) -> dict:
         agent="compliance",
         claimId=claimId,
         verdict=verdict,
+        finalVerdict=critique["finalVerdict"],
         requiresReview=complianceFindings.get("requiresReview"),
         message="Compliance agent completed",
     )
@@ -433,4 +538,5 @@ async def complianceNode(state: ClaimState) -> dict:
     return {
         "messages": [AIMessage(content=summaryMsg)],
         "complianceFindings": complianceFindings,
+        "critiqueResult": critique,
     }
