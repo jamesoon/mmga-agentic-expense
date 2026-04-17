@@ -290,3 +290,16 @@ async def test_evaluatorGateWithSubmittedClaim():
         assert "fraud" in nodesSeen, "Fraud should execute"
         assert "markAiReviewed" in nodesSeen, "markAiReviewed should execute"
         assert "advisor" in nodesSeen, "Advisor should execute"
+
+
+def testGraphContainsAbuseGuardNode() -> None:
+    """Spec A — abuseGuard must be a compiled node between intake and evaluatorGate."""
+    from unittest.mock import patch
+
+    from agentic_claims.core.config import Settings
+    from agentic_claims.core.graph import buildGraph
+
+    testSettings = Settings(_env_file="tests/.env.test")
+    with patch("agentic_claims.core.graph.getSettings", return_value=testSettings):
+        graph = buildGraph().compile()
+    assert "abuseGuard" in graph.nodes

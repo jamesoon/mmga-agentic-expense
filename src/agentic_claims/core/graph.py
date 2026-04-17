@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
 
+from agentic_claims.agents.abuse_guard.node import abuseGuardNode
 from agentic_claims.agents.advisor.node import advisorNode
 from agentic_claims.agents.compliance.node import complianceNode
 from agentic_claims.agents.intake_gpt.node import intakeGptNode
@@ -118,6 +119,7 @@ def buildGraph() -> StateGraph:
     builder.add_node("preIntakeValidator", preIntakeValidator)
     builder.add_node("intake", intakeNodeImpl)
     builder.add_node("humanEscalation", humanEscalationNode)
+    builder.add_node("abuseGuard", abuseGuardNode)
     builder.add_node("compliance", complianceNode)
     builder.add_node("fraud", fraudNode)
     builder.add_node("markAiReviewed", markAiReviewedNode)
@@ -158,13 +160,16 @@ def buildGraph() -> StateGraph:
         _intakeConditionalRouter,
         {
             "humanEscalation": "humanEscalation",
-            "submitted": "postSubmission",
+            "submitted": "abuseGuard",
             "pending": END,
         },
     )
 
     # humanEscalation is terminal
     builder.add_edge("humanEscalation", END)
+
+    # abuseGuard runs between intake and postSubmission (evaluatorGate submitted path)
+    builder.add_edge("abuseGuard", "postSubmission")
 
     # Fan-out from postSubmission to compliance and fraud (parallel)
     builder.add_edge("postSubmission", "compliance")
