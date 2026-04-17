@@ -75,3 +75,9 @@ class ClaimState(TypedDict):
     # While True, preModelHook injects a directive forcing the model's next tool
     # call to be askHuman — preventing the jump straight to searchPolicies.
     phase1ConfirmationPending: bool
+
+    # Spec A additions — post-mmae merge + hardening
+    userJustification: Optional[str]     # Typed by user at claim submission
+    abuseFlags: Optional[dict]           # Written by abuseGuard (B2 + B4 + B3 audit)
+    critiqueResult: Optional[dict]       # Written by compliance self-critique (B6)
+    userQuotaSnapshot: Optional[dict]    # Written by web middleware at request entry (B8)
