@@ -13,6 +13,8 @@ from starlette.staticfiles import StaticFiles
 from agentic_claims.core.config import getSettings
 from agentic_claims.core.graph import getCompiledGraph
 from agentic_claims.core.logging import setupLogging
+from agentic_claims.eval_worker.orchestrator import EvalOrchestrator
+from agentic_claims.web.middleware.publicRateLimit import PublicRateLimitMiddleware
 from agentic_claims.web.middleware.requestGuard import RequestGuardMiddleware
 from agentic_claims.web.routers.analytics import router as analyticsRouter
 from agentic_claims.web.routers.audit import router as auditRouter
@@ -23,6 +25,7 @@ from agentic_claims.web.routers.manage import router as manageRouter
 from agentic_claims.web.routers.pages import router as pagesRouter
 from agentic_claims.web.routers.health import router as healthRouter
 from agentic_claims.web.routers.logs import router as logsRouter
+from agentic_claims.web.routers.llmasjudge import router as llmasjudgeRouter
 from agentic_claims.web.routers.policies import router as policiesRouter
 from agentic_claims.web.routers.review import router as reviewRouter
 
@@ -63,7 +66,11 @@ async def lifespan(app: FastAPI):
     graph, pool = await getCompiledGraph()
     app.state.graph = graph
     app.state.pool = pool
+    app.state.settings = settings
     logger.info("LangGraph graph and checkpointer initialized (lifespan singleton)")
+    app.state.evalOrchestrator = EvalOrchestrator()
+    await app.state.evalOrchestrator.markOrphansInterrupted()
+    logger.info("EvalOrchestrator initialised; orphaned runs marked interrupted")
     yield
     await pool.close()
     logger.info("Checkpointer pool closed")
@@ -137,6 +144,12 @@ app.add_middleware(
 )
 app.add_middleware(RememberMeMiddleware)
 app.add_middleware(RequestGuardMiddleware, settings=settings)
+app.add_middleware(
+    PublicRateLimitMiddleware,
+    browsePerMin=60,
+    playgroundPerMin=settings.eval_max_playground_calls_per_min,
+    runsPerHour=settings.eval_max_runs_per_hour,
+)
 
 app.mount("/static", StaticFiles(directory=str(projectRoot / "static")), name="static")
 
@@ -151,3 +164,4 @@ app.include_router(healthRouter)
 app.include_router(logsRouter)
 app.include_router(policiesRouter)
 app.include_router(pagesRouter)
+app.include_router(llmasjudgeRouter)
