@@ -16,4 +16,7 @@ def testPromptMentionsRequestHumanInput() -> None:
 
 
 def testPromptMentionsPurposeOfExpense() -> None:
-    assert "Purpose of expense" in INTAKE_GPT_SYSTEM_PROMPT or "purpose of expense" in INTAKE_GPT_SYSTEM_PROMPT.lower()
+    assert (
+        "Purpose of expense" in INTAKE_GPT_SYSTEM_PROMPT
+        or "purpose of expense" in INTAKE_GPT_SYSTEM_PROMPT.lower()
+    )

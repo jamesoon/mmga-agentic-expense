@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 async def abuseGuardNode(state: ClaimState) -> dict[str, Any]:
     claimId = state.get("claimId", "unknown")
     dbClaimId = state.get("dbClaimId")
-    receipt = (state.get("extractedReceipt") or {}).get("fields") or (state.get("extractedReceipt") or {})
+    receipt = (state.get("extractedReceipt") or {}).get("fields") or (
+        state.get("extractedReceipt") or {}
+    )
     if not isinstance(receipt, dict):
         receipt = {}
     justification = state.get("userJustification") or ""

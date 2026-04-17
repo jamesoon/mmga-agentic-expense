@@ -9,20 +9,32 @@ from agentic_claims.agents.compliance.critique import runSelfCritique
 
 @pytest.mark.asyncio
 async def testCritiqueAgreesNoOp() -> None:
-    fake = type("R", (), {"content": '{"agree": true, "verdict": "pass", "reasoning": "clauses support pass"}'})()
+    fake = type(
+        "R",
+        (),
+        {"content": '{"agree": true, "verdict": "pass", "reasoning": "clauses support pass"}'},
+    )()
     with patch("agentic_claims.agents.compliance.critique.buildAgentLlm") as mockBuild:
         mockBuild.return_value.ainvoke = AsyncMock(return_value=fake)
-        result = await runSelfCritique(originalVerdict="pass", context={"violations": [], "justification": ""})
+        result = await runSelfCritique(
+            originalVerdict="pass", context={"violations": [], "justification": ""}
+        )
     assert result["critiqueAgrees"] is True
     assert result["finalVerdict"] == "pass"
 
 
 @pytest.mark.asyncio
 async def testCritiqueDisagreesFlips() -> None:
-    fake = type("R", (), {"content": '{"agree": false, "verdict": "requiresReview", "reasoning": "flagged"}'})()
+    fake = type(
+        "R",
+        (),
+        {"content": '{"agree": false, "verdict": "requiresReview", "reasoning": "flagged"}'},
+    )()
     with patch("agentic_claims.agents.compliance.critique.buildAgentLlm") as mockBuild:
         mockBuild.return_value.ainvoke = AsyncMock(return_value=fake)
-        result = await runSelfCritique(originalVerdict="pass", context={"violations": [], "justification": ""})
+        result = await runSelfCritique(
+            originalVerdict="pass", context={"violations": [], "justification": ""}
+        )
     assert result["critiqueAgrees"] is False
     assert result["finalVerdict"] == "requiresReview"
 

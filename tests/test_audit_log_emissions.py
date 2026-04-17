@@ -21,9 +21,13 @@ async def testCoherenceFailureEmitsOneAuditRow() -> None:
         "extractedReceipt": {"fields": {"category": "meals"}},
         "userJustification": "x",  # too short → coherence fails
     }
-    with patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy), \
-         patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(True, "ok"))):
+    with (
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy),
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(True, "ok")),
+        ),
+    ):
         await abuseGuardNode(state)
 
     coherenceWrites = [w for w in writes if w.get("action") == "coherence_failed"]
@@ -45,9 +49,13 @@ async def testCrossCheckFailureEmitsOneAuditRow() -> None:
         "extractedReceipt": {"fields": {"category": "accommodation"}},
         "userJustification": "client lunch at Acme Corp for project kickoff",  # passes coherence
     }
-    with patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy), \
-         patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(False, "category mismatch"))):
+    with (
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy),
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(False, "category mismatch")),
+        ),
+    ):
         await abuseGuardNode(state)
 
     crossCheckWrites = [w for w in writes if w.get("action") == "cross_check_failed"]
@@ -68,9 +76,13 @@ async def testBothFailuresEmitTwoAuditRows() -> None:
         "extractedReceipt": {"fields": {"category": "meals"}},
         "userJustification": "x",  # fails coherence
     }
-    with patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy), \
-         patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(False, "mismatch"))):
+    with (
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy),
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(False, "mismatch")),
+        ),
+    ):
         await abuseGuardNode(state)
 
     assert len(writes) == 2
@@ -89,12 +101,18 @@ async def testCleanPathEmitsZeroAuditRows() -> None:
     state = {
         "claimId": "C",
         "dbClaimId": 7,
-        "extractedReceipt": {"fields": {"category": "meals", "merchant": "ABC", "totalAmountSgd": 40}},
+        "extractedReceipt": {
+            "fields": {"category": "meals", "merchant": "ABC", "totalAmountSgd": 40}
+        },
         "userJustification": "client lunch meeting with Acme Corp",
     }
-    with patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy), \
-         patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(True, "ok"))):
+    with (
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", spy),
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(True, "ok")),
+        ),
+    ):
         await abuseGuardNode(state)
 
     assert writes == []

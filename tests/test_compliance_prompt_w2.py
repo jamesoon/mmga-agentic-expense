@@ -14,7 +14,10 @@ def testPromptDiscussesUserInputFence() -> None:
 def testPromptForbidsHardOverride() -> None:
     # The prompt must explicitly forbid overriding hard violations via justification
     assert "hard" in COMPLIANCE_SYSTEM_PROMPT
-    assert "MUST NOT be overridden" in COMPLIANCE_SYSTEM_PROMPT or "must not be overridden" in COMPLIANCE_SYSTEM_PROMPT.lower()
+    assert (
+        "MUST NOT be overridden" in COMPLIANCE_SYSTEM_PROMPT
+        or "must not be overridden" in COMPLIANCE_SYSTEM_PROMPT.lower()
+    )
 
 
 def testPromptDiscussesSoftPlus() -> None:

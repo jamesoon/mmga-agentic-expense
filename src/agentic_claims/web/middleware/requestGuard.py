@@ -53,9 +53,7 @@ class RequestGuardMiddleware(BaseHTTPMiddleware):
         just = str(parsed.get("justification", ""))
 
         if len(msg) > s.max_message_chars:
-            return Response(
-                f"message exceeds {s.max_message_chars} chars", status_code=413
-            )
+            return Response(f"message exceeds {s.max_message_chars} chars", status_code=413)
         if len(just) > s.max_justification_chars:
             return Response(
                 f"justification exceeds {s.max_justification_chars} chars",
@@ -64,9 +62,7 @@ class RequestGuardMiddleware(BaseHTTPMiddleware):
 
         for text in (msg, just):
             if any(not _isSafeChar(c) for c in text):
-                return Response(
-                    "request contains control characters", status_code=400
-                )
+                return Response("request contains control characters", status_code=400)
 
         now = time.time()
         window = self._sessionHits[sessionKey]

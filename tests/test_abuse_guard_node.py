@@ -11,13 +11,19 @@ from agentic_claims.agents.abuse_guard.node import abuseGuardNode
 async def testAllPasses() -> None:
     state = {
         "claimId": "C1",
-        "extractedReceipt": {"fields": {"category": "meals", "merchant": "ABC", "totalAmountSgd": 40}},
+        "extractedReceipt": {
+            "fields": {"category": "meals", "merchant": "ABC", "totalAmountSgd": 40}
+        },
         "userJustification": "client lunch meeting with Acme Corp",
         "dbClaimId": 123,
     }
-    with patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(True, "ok"))), \
-         patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()):
+    with (
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(True, "ok")),
+        ),
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()),
+    ):
         out = await abuseGuardNode(state)
     flags = out["abuseFlags"]
     assert flags["coherenceOk"] is True
@@ -31,9 +37,13 @@ async def testCoherenceFailureRecorded() -> None:
         "extractedReceipt": {"fields": {"category": "meals"}},
         "userJustification": "asdf",  # fails coherence
     }
-    with patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(True, "ok"))), \
-         patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()):
+    with (
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(True, "ok")),
+        ),
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()),
+    ):
         out = await abuseGuardNode(state)
     assert out["abuseFlags"]["coherenceOk"] is False
 
@@ -45,8 +55,12 @@ async def testCrossCheckFailureRecorded() -> None:
         "extractedReceipt": {"fields": {"category": "accommodation"}},
         "userJustification": "client lunch meeting at hotel conference room",
     }
-    with patch("agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
-               AsyncMock(return_value=(False, "category mismatch"))), \
-         patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()):
+    with (
+        patch(
+            "agentic_claims.agents.abuse_guard.node.checkReceiptJustificationAlignment",
+            AsyncMock(return_value=(False, "category mismatch")),
+        ),
+        patch("agentic_claims.agents.abuse_guard.node.writeGuardEvent", AsyncMock()),
+    ):
         out = await abuseGuardNode(state)
     assert out["abuseFlags"]["crossCheckOk"] is False

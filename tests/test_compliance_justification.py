@@ -14,8 +14,10 @@ _TEST_SETTINGS = Settings(_env_file="tests/.env.test")
 @contextmanager
 def _patchSettings():
     """Patch getSettings in every module that calls it directly."""
-    with patch("agentic_claims.agents.compliance.node.getSettings", return_value=_TEST_SETTINGS), \
-         patch("agentic_claims.core.logging.getSettings", return_value=_TEST_SETTINGS):
+    with (
+        patch("agentic_claims.agents.compliance.node.getSettings", return_value=_TEST_SETTINGS),
+        patch("agentic_claims.core.logging.getSettings", return_value=_TEST_SETTINGS),
+    ):
         yield
 
 
@@ -43,9 +45,7 @@ def _baseState(**kw) -> dict:
 async def testHardCapAutoEscalates() -> None:
     """Receipt total > per-receipt cap => verdict flagged as requiring director approval."""
     state = _baseState(
-        extractedReceipt={
-            "fields": {"category": "meals", "merchant": "X", "totalAmountSgd": 9999}
-        },
+        extractedReceipt={"fields": {"category": "meals", "merchant": "X", "totalAmountSgd": 9999}},
     )
     fakeLlmResp = type("R", (), {"content": '{"verdict": "pass"}'})()
     critiqueResp = {
@@ -56,10 +56,15 @@ async def testHardCapAutoEscalates() -> None:
         "critiqueReasoning": "",
         "rawLlmResponse": "",
     }
-    with _patchSettings(), \
-         patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])), \
-         patch("agentic_claims.agents.compliance.node.runSelfCritique", AsyncMock(return_value=critiqueResp)), \
-         patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm:
+    with (
+        _patchSettings(),
+        patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])),
+        patch(
+            "agentic_claims.agents.compliance.node.runSelfCritique",
+            AsyncMock(return_value=critiqueResp),
+        ),
+        patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm,
+    ):
         mockLlm.return_value.ainvoke = AsyncMock(return_value=fakeLlmResp)
         out = await complianceNode(state)
     findings = out["complianceFindings"]
@@ -83,10 +88,15 @@ async def testAbuseFlagCoherenceIgnoresJustification() -> None:
         "rawLlmResponse": "",
     }
     fakeLlmResp = type("R", (), {"content": '{"verdict": "fail"}'})()
-    with _patchSettings(), \
-         patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])), \
-         patch("agentic_claims.agents.compliance.node.runSelfCritique", AsyncMock(return_value=critiqueResp)), \
-         patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm:
+    with (
+        _patchSettings(),
+        patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])),
+        patch(
+            "agentic_claims.agents.compliance.node.runSelfCritique",
+            AsyncMock(return_value=critiqueResp),
+        ),
+        patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm,
+    ):
         mockLlm.return_value.ainvoke = AsyncMock(return_value=fakeLlmResp)
         out = await complianceNode(state)
     findings = out["complianceFindings"]
@@ -108,10 +118,15 @@ async def testCritiqueFlipsVerdict() -> None:
         "rawLlmResponse": "",
     }
     fakeLlmResp = type("R", (), {"content": '{"verdict": "pass"}'})()
-    with _patchSettings(), \
-         patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])), \
-         patch("agentic_claims.agents.compliance.node.runSelfCritique", AsyncMock(return_value=critiqueResp)), \
-         patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm:
+    with (
+        _patchSettings(),
+        patch("agentic_claims.agents.compliance.node.mcpCallTool", AsyncMock(return_value=[])),
+        patch(
+            "agentic_claims.agents.compliance.node.runSelfCritique",
+            AsyncMock(return_value=critiqueResp),
+        ),
+        patch("agentic_claims.agents.compliance.node.buildAgentLlm") as mockLlm,
+    ):
         mockLlm.return_value.ainvoke = AsyncMock(return_value=fakeLlmResp)
         out = await complianceNode(state)
     findings = out["complianceFindings"]

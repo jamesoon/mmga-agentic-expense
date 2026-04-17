@@ -51,7 +51,9 @@ async def runSelfCritique(
             "rawLlmResponse": "",
         }
 
-    temperature = getattr(settings, "compliance_critique_temperature", 0.0) if settings is not None else 0.0
+    temperature = (
+        getattr(settings, "compliance_critique_temperature", 0.0) if settings is not None else 0.0
+    )
     try:
         llm = buildAgentLlm(settings, temperature=temperature, useFallback=True)
     except Exception as exc:

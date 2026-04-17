@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 _HARD_TYPES = {
     "alcohol_outside_allowlist",
     "non_claimable_personal",

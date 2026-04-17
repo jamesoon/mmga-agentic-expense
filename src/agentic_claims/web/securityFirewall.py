@@ -14,7 +14,10 @@ FENCE_OPEN = "<user_input>"
 FENCE_CLOSE = "</user_input>"
 
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("ignore_previous_instructions", re.compile(r"ignore\s+(?:all\s+|previous\s+)?instructions?", re.IGNORECASE)),
+    (
+        "ignore_previous_instructions",
+        re.compile(r"ignore\s+(?:all\s+|previous\s+)?instructions?", re.IGNORECASE),
+    ),
     ("disregard_the_above", re.compile(r"disregard\s+(?:the\s+)?above", re.IGNORECASE)),
     ("system_tag", re.compile(r"(?im)^\s*system\s*:")),
     ("inst_tag", re.compile(r"\[/?INST\]")),

@@ -22,7 +22,11 @@ async def testConsistentJustificationReturnsOk() -> None:
 
 @pytest.mark.asyncio
 async def testInconsistentJustificationReturnsFail() -> None:
-    fakeResponse = type("R", (), {"content": '{"consistent": false, "reason": "receipt is hotel but user claims meal"}'})()
+    fakeResponse = type(
+        "R",
+        (),
+        {"content": '{"consistent": false, "reason": "receipt is hotel but user claims meal"}'},
+    )()
     with patch("agentic_claims.agents.abuse_guard.crossCheck.buildAgentLlm") as mockBuild:
         mockBuild.return_value.ainvoke = AsyncMock(return_value=fakeResponse)
         ok, reason = await checkReceiptJustificationAlignment(

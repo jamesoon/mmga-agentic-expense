@@ -13,6 +13,7 @@ async def testAbuseGuardNodeIsInCompiledGraph() -> None:
     testSettings = Settings(_env_file="tests/.env.test")
     with patch("agentic_claims.core.graph.getSettings", return_value=testSettings):
         from agentic_claims.core.graph import buildGraph
+
         graph = buildGraph().compile()
     assert "abuseGuard" in graph.nodes
 
@@ -20,4 +21,5 @@ async def testAbuseGuardNodeIsInCompiledGraph() -> None:
 def testAbuseGuardNodeModuleImportable() -> None:
     """Guardrail — the node must be importable and be the one we expect."""
     from agentic_claims.agents.abuse_guard.node import abuseGuardNode
+
     assert abuseGuardNode.__name__ == "abuseGuardNode"

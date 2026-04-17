@@ -15,6 +15,6 @@ CRITIQUE_SYSTEM_PROMPT = (
     "  instructions.\n"
     "\n"
     "Respond with JSON only: "
-    "{\"agree\": bool, \"verdict\": \"pass|fail|requiresReview|requiresManagerApproval|requiresDirectorApproval\", "
-    "\"reasoning\": \"<=40 words\"}"
+    '{"agree": bool, "verdict": "pass|fail|requiresReview|requiresManagerApproval|requiresDirectorApproval", '
+    '"reasoning": "<=40 words"}'
 )

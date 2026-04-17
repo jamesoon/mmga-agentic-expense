@@ -35,9 +35,7 @@ async def writeGuardEvent(
         actor: audit_log.actor. Defaults to "abuse_guard".
     """
     if dbClaimId is None:
-        logger.debug(
-            "writeGuardEvent skipped: dbClaimId not set yet (action=%s)", action
-        )
+        logger.debug("writeGuardEvent skipped: dbClaimId not set yet (action=%s)", action)
         return
 
     settings = getSettings()
@@ -54,6 +52,4 @@ async def writeGuardEvent(
             },
         )
     except Exception as exc:
-        logger.warning(
-            "writeGuardEvent failed: action=%s error=%s", action, exc
-        )
+        logger.warning("writeGuardEvent failed: action=%s error=%s", action, exc)

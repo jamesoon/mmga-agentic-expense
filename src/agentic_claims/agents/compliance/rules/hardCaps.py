@@ -21,13 +21,11 @@ def evaluateHardCaps(
     reasons: list[str] = []
     if receiptTotalSgd > settings.hard_cap_per_receipt_sgd:
         reasons.append(
-            f"per-receipt cap ({settings.hard_cap_per_receipt_sgd} SGD) "
-            f"exceeded: {receiptTotalSgd}"
+            f"per-receipt cap ({settings.hard_cap_per_receipt_sgd} SGD) exceeded: {receiptTotalSgd}"
         )
     if claimTotalSgd > settings.hard_cap_per_claim_sgd:
         reasons.append(
-            f"per-claim cap ({settings.hard_cap_per_claim_sgd} SGD) "
-            f"exceeded: {claimTotalSgd}"
+            f"per-claim cap ({settings.hard_cap_per_claim_sgd} SGD) exceeded: {claimTotalSgd}"
         )
     if monthlyTotalSgd > settings.hard_cap_per_employee_per_month_sgd:
         reasons.append(

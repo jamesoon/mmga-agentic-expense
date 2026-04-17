@@ -1,8 +1,6 @@
 """Prompt-injection firewall unit tests (B3)."""
 
-import pytest
-
-from agentic_claims.web.securityFirewall import sanitizeUserText, FENCE_OPEN, FENCE_CLOSE
+from agentic_claims.web.securityFirewall import FENCE_CLOSE, FENCE_OPEN, sanitizeUserText
 
 
 def testWrapsInFence() -> None:
