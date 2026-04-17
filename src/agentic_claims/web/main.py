@@ -13,6 +13,7 @@ from starlette.staticfiles import StaticFiles
 from agentic_claims.core.config import getSettings
 from agentic_claims.core.graph import getCompiledGraph
 from agentic_claims.core.logging import setupLogging
+from agentic_claims.web.middleware.requestGuard import RequestGuardMiddleware
 from agentic_claims.web.routers.analytics import router as analyticsRouter
 from agentic_claims.web.routers.audit import router as auditRouter
 from agentic_claims.web.routers.auth import router as authRouter
@@ -135,6 +136,7 @@ app.add_middleware(
     https_only=False,
 )
 app.add_middleware(RememberMeMiddleware)
+app.add_middleware(RequestGuardMiddleware, settings=settings)
 
 app.mount("/static", StaticFiles(directory=str(projectRoot / "static")), name="static")
 
