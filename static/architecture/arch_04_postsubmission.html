@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>04 · Post-Submission — Expense AI Architecture</title>
+<link rel="stylesheet" href="arch_shared.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">EA</div>
+    <span class="topnav-title">Expense AI · Architecture</span>
+  </div>
+  <div class="topnav-pages">
+    <a href="arch_01_system_overview.html">01 System</a>
+    <a href="arch_02_tech_stack.html">02 Tech Stack</a>
+    <a href="arch_03_intake_workflow.html">03 Intake</a>
+    <a href="arch_04_postsubmission.html" class="active">04 Post-Submission</a>
+    <a href="arch_05_defence.html">05 Defence</a>
+  </div>
+  <div class="topnav-badge">v1.2.0 · ap-southeast-1</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Architecture · Section 04</div>
+  <h1>Post-Submission Pipeline</h1>
+  <p>After a claim is submitted, three agents run to evaluate and route it — Compliance and Fraud execute in parallel via LangGraph fan-out, then the Advisor synthesises all findings into a routing decision with email notification and a full audit trail.</p>
+</div>
+
+<div class="container">
+
+  <!-- Pipeline overview -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">1</div>
+      <div>
+        <h2>Pipeline Graph</h2>
+        <p>Post-submission node topology with decision paths</p>
+      </div>
+    </div>
+    <div class="diagram-card">
+      <div class="diagram-title">Parallel fan-out → aggregation → routing</div>
+      <div class="mermaid">
+flowchart LR
+  classDef guard  fill:#2a1818,color:#ffb3b3,stroke:#e05252
+  classDef agent  fill:#1d2a3a,color:#e2eaf3,stroke:#4d94ff
+  classDef route  fill:#1a2a20,color:#b3f5d3,stroke:#36c789
+  classDef end_   fill:#1d2040,color:#b3c8ff,stroke:#9b6dff
+
+  AG["abuseGuard\nB2·B4·B5·B6"]:::guard
+  PS["postSubmission\nFan-out gate"]:::agent
+
+  subgraph PAR["  Parallel execution (same LangGraph superstep)  "]
+    CO["compliance\n① RAG policy lookup\n② W2 justification eval\n③ B6 self-critique verifier"]:::agent
+    FR["fraud\n① Exact duplicate check\n② Recent claims history\n③ Merchant anomaly (LLM)"]:::agent
+  end
+
+  MR["markAiReviewed\nState aggregation"]:::agent
+  AD["advisor\n① synthesise findings\n② searchPolicies\n③ updateClaimStatus\n④ sendNotification"]:::agent
+
+  APP(["✅ auto_approve\nstatus = ai_approved"]):::route
+  RET(["↩ return_to_claimant\nstatus = ai_rejected"]):::route
+  ESC(["🔔 escalate_to_reviewer\nstatus = escalated"]):::route
+
+  AG --> PS
+  PS --> CO & FR
+  CO --> MR
+  FR --> MR
+  MR --> AD
+  AD --> APP & RET & ESC
+      </div>
+    </div>
+  </div>
+
+  <!-- Compliance + Fraud details side by side -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">2</div>
+      <div>
+        <h2>Compliance &amp; Fraud Agents</h2>
+        <p>Detailed sequence for each parallel agent</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="diagram-card">
+        <div class="diagram-title" style="color:var(--gold)">Compliance Node — Evaluator pattern</div>
+        <div class="mermaid">
+sequenceDiagram
+  participant CO as compliance
+  participant RAG as MCP-RAG
+  participant LLM as Qwen3-235B
+  participant DB as MCP-DB
+
+  CO->>DB: insertAuditLog(compliance_check_start)
+  CO->>RAG: searchPolicies(category + merchant, limit=8)
+  RAG-->>CO: relevant policy clauses
+
+  Note over CO: Build evaluation prompt with:<br/>- extractedReceipt<br/>- violations (classified soft/soft-plus/hard)<br/>- userJustification (if coherenceOk)<br/>- abuseFlags<br/>- W2 justification rules
+  CO->>LLM: evaluate claim (temp=0.1)
+  LLM-->>CO: {verdict, violations, citedClauses,<br/>requiresManagerApproval, summary}
+
+  Note over CO: B6 Self-critique (2nd call)
+  CO->>LLM: critique verdict (temp=0.0, different prompt)
+  LLM-->>CO: {agree, verdict, reasoning}
+  Note over CO: If disagrees → finalVerdict = requiresReview
+
+  CO->>DB: insertAuditLog(compliance_check)
+  opt critique flipped verdict
+    CO->>DB: insertAuditLog(critique_flipped)
+  end
+        </div>
+      </div>
+      <div class="diagram-card">
+        <div class="diagram-title" style="color:var(--orange)">Fraud Node — Tool Call + Rules pattern</div>
+        <div class="mermaid">
+sequenceDiagram
+  participant FR as fraud
+  participant DB as MCP-DB
+  participant LLM as Qwen3-235B
+
+  FR->>DB: exactDuplicateCheck(merchant, amount, date, employeeId)
+  DB-->>FR: [{matchingClaimId, ...}] or []
+
+  alt exact duplicate found
+    Note over FR: Short-circuit — no LLM call
+    FR-->>FR: verdict = duplicate_fraud
+  else no exact duplicate
+    FR->>DB: recentClaimsByEmployee(employeeId, 30 days)
+    DB-->>FR: recent claims list
+
+    FR->>DB: claimsByMerchantAndEmployee(merchant, employeeId, 90 days)
+    DB-->>FR: merchant history with amounts
+
+    Note over FR: Calculate stats:<br/>- avg merchant amount<br/>- 30-day claim frequency<br/>- suspicious patterns
+    FR->>LLM: anomaly detection (stats context, temp=0.1)
+    LLM-->>FR: {verdict, flags, summary}
+  end
+
+  FR->>DB: insertAuditLog(fraud_check)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advisor + Reviewer flow -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">3</div>
+      <div>
+        <h2>Advisor &amp; Reviewer Flow</h2>
+        <p>Final routing decision and human reviewer interaction</p>
+      </div>
+    </div>
+    <div class="diagram-card">
+      <div class="diagram-title">Advisor → routing decision → reviewer action</div>
+      <div class="mermaid">
+sequenceDiagram
+  actor Rev as Reviewer
+  participant AD as advisor (ReAct)
+  participant RAG as MCP-RAG
+  participant LLM as Qwen3-235B
+  participant DB as MCP-DB
+  participant EML as MCP-Email
+  participant UI as Review Dashboard
+
+  Note over AD: Receives complianceFindings + fraudFindings
+
+  AD->>RAG: searchPolicies(risk context)
+  RAG-->>AD: additional policy context
+  AD->>LLM: synthesise all findings → routing decision
+  LLM-->>AD: {decision, reasoning, policyCitations}
+
+  alt auto_approve
+    AD->>DB: updateClaimStatus(ai_approved)
+    AD->>EML: sendClaimNotification(claimant, approved)
+    Note over AD: Claim resolved — no human needed
+  else return_to_claimant
+    AD->>DB: updateClaimStatus(ai_rejected)
+    AD->>EML: sendClaimNotification(claimant, returned + reason)
+  else escalate_to_reviewer
+    AD->>DB: updateClaimStatus(escalated)
+    AD->>EML: sendClaimNotification(reviewer, escalation alert)
+    AD->>DB: insertAuditLog(advisor_decision: escalate)
+
+    Rev->>UI: GET /review/{claimId}
+    UI->>DB: getClaimWithReceipts + audit_log
+    DB-->>UI: full claim record + timeline
+    UI-->>Rev: Compliance findings (W2 verdict, self-critique)<br/>Fraud flags · Advisor reasoning<br/>Full audit trail
+
+    alt Reviewer approves
+      Rev->>UI: POST /review/{claimId}/approve
+      UI->>DB: updateClaimStatus(manually_approved)
+      UI->>EML: sendClaimNotification(claimant, approved)
+    else Reviewer returns
+      Rev->>UI: POST /review/{claimId}/return
+      UI->>DB: updateClaimStatus(returned)
+      UI->>EML: sendClaimNotification(claimant, returned + reason)
+    end
+    UI->>DB: insertAuditLog(reviewer_action)
+  end
+      </div>
+    </div>
+  </div>
+
+  <!-- Verdicts table -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">4</div>
+      <div>
+        <h2>Verdict Matrix</h2>
+        <p>All possible verdicts and what triggers them</p>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Verdict</th><th>Source</th><th>Trigger condition</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="pill" style="color:var(--green);border-color:var(--green)">pass</span></td>
+            <td>Compliance</td>
+            <td>No violations; within all policy caps</td>
+            <td>Advisor may auto-approve</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--gold);border-color:var(--gold)">requiresManagerApproval</span></td>
+            <td>Compliance</td>
+            <td>Soft violation (≤150% cap) + coherent justification</td>
+            <td>Advisor escalates to reviewer</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--orange);border-color:var(--orange)">requiresDirectorApproval</span></td>
+            <td>Compliance / B5</td>
+            <td>Soft-plus violation (>150% cap) or B5 hard-cap exceeded</td>
+            <td>Advisor escalates — director must approve</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--blue);border-color:var(--blue)">requiresReview</span></td>
+            <td>B6 critique / parse fail</td>
+            <td>Self-critique disagrees with primary verdict OR LLM output unparseable</td>
+            <td>Advisor always escalates</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">fail</span></td>
+            <td>Compliance</td>
+            <td>Hard violation (alcohol, personal, non-claimable)</td>
+            <td>Advisor returns to claimant</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">duplicate_fraud</span></td>
+            <td>Fraud</td>
+            <td>Exact duplicate in DB (same merchant, amount, date, employee)</td>
+            <td>Advisor escalates with fraud flag</td>
+          </tr>
+          <tr>
+            <td><span class="pill" style="color:var(--orange);border-color:var(--orange)">suspicious</span></td>
+            <td>Fraud</td>
+            <td>LLM detects statistical anomaly (high frequency, unusual amount)</td>
+            <td>Advisor escalates for review</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Expense AI · SUTD MSTR-DAIE · Multimodal Agentic GenAI</span>
+  <span>04 / 05 · Post-Submission Pipeline</span>
+  <span>v1.2.0 · mmga.mdaie-sutd.fit</span>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true, theme: 'dark',
+  themeVariables: {
+    background: '#162032', primaryColor: '#1d2e45',
+    primaryTextColor: '#e2eaf3', primaryBorderColor: '#4d94ff',
+    lineColor: '#4a6a85', signalColor: '#4d94ff',
+    activationBkgColor: '#1d2a3a', activationBorderColor: '#4d94ff',
+    fontFamily: 'Inter, system-ui, sans-serif', fontSize: '12px',
+    clusterBkg: '#1a2030', clusterBorder: '#f5a623',
+    noteBkgColor: '#243752', noteTextColor: '#a8c0d6',
+  },
+  sequence: { useMaxWidth: true, boxMargin: 10, mirrorActors: false },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
+</script>
+</body>
+</html>

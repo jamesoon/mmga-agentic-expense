@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>03 · Intake Workflow — Expense AI Architecture</title>
+<link rel="stylesheet" href="arch_shared.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">EA</div>
+    <span class="topnav-title">Expense AI · Architecture</span>
+  </div>
+  <div class="topnav-pages">
+    <a href="arch_01_system_overview.html">01 System</a>
+    <a href="arch_02_tech_stack.html">02 Tech Stack</a>
+    <a href="arch_03_intake_workflow.html" class="active">03 Intake</a>
+    <a href="arch_04_postsubmission.html">04 Post-Submission</a>
+    <a href="arch_05_defence.html">05 Defence</a>
+  </div>
+  <div class="topnav-badge">v1.2.0 · ap-southeast-1</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Architecture · Section 03</div>
+  <h1>Intake Workflow</h1>
+  <p>Pre-submission phase — how a claimant's receipt image becomes a validated, persisted claim through the <code>intake_gpt</code> ReAct subgraph with 6 tools, multimodal extraction, RAG policy validation, and human-in-the-loop justification capture.</p>
+</div>
+
+<div class="container">
+
+  <!-- Tools row -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">1</div>
+      <div>
+        <h2>Intake Agent Tools</h2>
+        <p>The 6 tools bound to the <code>intake_gpt</code> ReAct subgraph</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="stack-card">
+        <div class="stack-tag tag-orange">Tool 1</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">getClaimSchema</div>
+        <div class="tech-detail">Returns the structured field template the agent must populate before submitting. Anchors the ReAct loop to the required output schema.</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-tag tag-purple">Tool 2 · VLM</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">extractReceiptFields</div>
+        <div class="tech-detail">Encodes the receipt image (base64), calls Gemini 2.0 Flash via OpenRouter, parses structured JSON response. OpenCV quality gate rejects blurry images before the VLM call.</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-tag tag-green">Tool 3 · RAG</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">searchPolicies</div>
+        <div class="tech-detail">Calls MCP-RAG → Qdrant. Semantic search over 5 policy documents (meals, transport, accommodation, office supplies, general). Returns top-N chunks with scores.</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-tag tag-green">Tool 4 · FX</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">convertCurrency</div>
+        <div class="tech-detail">Calls MCP-Currency → Frankfurter API. Converts any foreign currency to SGD. Returns original amount, converted amount, exchange rate, and date. Falls back to manual rate on API failure.</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-tag tag-blue">Tool 5 · DB</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">submitClaim</div>
+        <div class="tech-detail">Calls MCP-DB → PostgreSQL. Creates claim + receipt row, writes initial audit log. Returns claimId + claimNumber. Sets <code>claimSubmitted=true</code> in state, triggering the evaluator gate.</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-tag tag-red">Tool 6 · HIL</div>
+        <div class="tech-name" style="font-family:monospace;font-size:13px">requestHumanInput</div>
+        <div class="tech-detail">Triggers a LangGraph interrupt. Pauses the graph and surfaces a question to the user via SSE. Resumes when the user responds. Used for confirmations and justification capture.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sequence diagram -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">2</div>
+      <div>
+        <h2>Claim Submission Sequence</h2>
+        <p>Happy path from receipt upload to claim persisted</p>
+      </div>
+    </div>
+    <div class="diagram-card">
+      <div class="diagram-title">Pre-submission: Claimant → intake_gpt → MCP servers</div>
+      <div class="mermaid">
+sequenceDiagram
+  actor C as Claimant
+  participant UI as FastAPI / SSE
+  participant FW as Injection Firewall (B3)
+  participant I as intake_gpt (ReAct)
+  participant VLM as Gemini 2.0 Flash
+  participant RAG as MCP-RAG · Qdrant
+  participant FX as MCP-Currency
+  participant DB as MCP-DB · PostgreSQL
+
+  C->>UI: Upload receipt image
+  Note over UI: B1 rate + length check
+  UI->>FW: sanitizeUserText()
+  FW-->>UI: fenced sanitized message
+  UI->>I: HumanMessage + claimId
+
+  I->>I: getClaimSchema()
+  Note over I: Knows required fields
+
+  I->>VLM: extractReceiptFields(base64 image)
+  Note over VLM: OpenCV blur/resolution gate first
+  VLM-->>I: {merchant, date, amount,<br/>currency, category, confidence}
+
+  I->>RAG: searchPolicies(category + amount)
+  RAG-->>I: top-5 relevant policy clauses
+
+  alt amount in foreign currency
+    I->>FX: convertCurrency(amount, currency → SGD)
+    FX-->>I: {sgdAmount, rate, date}
+  end
+
+  I-->>UI: Stream extraction results + violations (SSE)
+  UI-->>C: Show fields, confidence scores, policy flags
+
+  I->>I: requestHumanInput("Please confirm or correct the extracted fields")
+  Note over I: LangGraph interrupt — graph pauses
+  C->>UI: Confirm (or correct + resubmit)
+  UI->>I: Resume with user response
+
+  opt policy violation detected
+    I->>I: requestHumanInput("Please provide a justification for this expense")
+    C->>UI: Type justification text
+    UI->>FW: sanitizeUserText(justification)
+    FW-->>UI: fenced justification
+    UI->>I: Resume with justification
+  end
+
+  I->>DB: submitClaim(claim + receipt + justification)
+  DB-->>I: {claimId, claimNumber: "CLAIM-###"}
+  Note over I: Sets claimSubmitted=true in ClaimState
+  I-->>UI: "Claim submitted ✓ CLAIM-###" (SSE final)
+  UI-->>C: Submission confirmation
+      </div>
+    </div>
+  </div>
+
+  <!-- State flow diagram -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">3</div>
+      <div>
+        <h2>ClaimState After Intake</h2>
+        <p>Fields written to shared state during the intake phase</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="diagram-card">
+        <div class="diagram-title">State written by intake_gpt</div>
+        <div class="mermaid">
+graph LR
+  classDef written fill:#1a2a20,color:#b3f5d3,stroke:#36c789
+  classDef existing fill:#1d2e45,color:#e2eaf3,stroke:#4d94ff
+  classDef new fill:#2a1818,color:#ffb3b3,stroke:#e05252
+
+  START(["intake_gpt\ncompletes"]) --> S1
+
+  S1["extractedReceipt\n{fields, confidence}"]:::written
+  S2["violations\n[{type, amount, cap}]"]:::written
+  S3["currencyConversion\n{original, sgd, rate}"]:::written
+  S4["claimSubmitted = true"]:::written
+  S5["claimNumber\n'CLAIM-###'"]:::written
+  S6["dbClaimId\nPostgreSQL FK"]:::written
+  S7["intakeFindings\n{mismatches, overrides}"]:::written
+  S8["userJustification\n(Spec A — typed by user)"]:::new
+  S9["messages\n(append-only history)"]:::existing
+
+  START --> S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9
+        </div>
+      </div>
+      <div class="card" style="padding:24px">
+        <div class="diagram-title" style="margin-bottom:16px">Image store pattern</div>
+        <p style="margin-bottom:16px;font-size:13px">Receipt images are stored in an in-memory <code>imageStore</code> dict (keyed by <code>claimId</code>), not in the LangGraph state. This avoids embedding ~58 KB of base64 data into every checkpoint and LLM context.</p>
+        <div style="background:var(--navy3);border-radius:8px;padding:16px;font-family:monospace;font-size:12px;color:var(--text2)">
+          <div style="color:var(--grey);margin-bottom:8px"># Web layer stores on upload</div>
+          <div>imageStore[claimId] = base64_image</div>
+          <br/>
+          <div style="color:var(--grey);margin-bottom:8px"># extractReceiptFields tool retrieves</div>
+          <div>image = imageStore.get(claimId)</div>
+          <div style="color:var(--green)">→ passed to VLM directly</div>
+          <div style="color:var(--green)">→ LLM context stays clean</div>
+        </div>
+        <div class="divider" style="margin:16px 0"></div>
+        <div class="diagram-title" style="margin-bottom:10px">Multimodal grounding</div>
+        <table style="font-size:12px">
+          <thead><tr><th>Modality</th><th>Source</th><th>Consumer</th></tr></thead>
+          <tbody>
+            <tr><td>Image</td><td>Receipt photo</td><td>extractReceiptFields (VLM)</td></tr>
+            <tr><td>Text</td><td>Policy docs</td><td>searchPolicies (RAG)</td></tr>
+            <tr><td>Structured</td><td>FX rates / DB history</td><td>convertCurrency / fraud</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Expense AI · SUTD MSTR-DAIE · Multimodal Agentic GenAI</span>
+  <span>03 / 05 · Intake Workflow</span>
+  <span>v1.2.0 · mmga.mdaie-sutd.fit</span>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true, theme: 'dark',
+  themeVariables: {
+    background: '#162032', primaryColor: '#1d2e45',
+    primaryTextColor: '#e2eaf3', primaryBorderColor: '#4d94ff',
+    lineColor: '#4a6a85', signalColor: '#4d94ff',
+    activationBkgColor: '#1d2a3a', activationBorderColor: '#4d94ff',
+    fontFamily: 'Inter, system-ui, sans-serif', fontSize: '12px',
+    clusterBkg: '#1a2030', clusterBorder: '#f5a623',
+    labelBoxBkgColor: '#162032', labelTextColor: '#e2eaf3',
+    noteBkgColor: '#243752', noteTextColor: '#a8c0d6',
+  },
+  sequence: { useMaxWidth: true, boxMargin: 10, mirrorActors: false },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
+</script>
+</body>
+</html>

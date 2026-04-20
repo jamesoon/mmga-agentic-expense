@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>05 · Defence Layers — Expense AI Architecture</title>
+<link rel="stylesheet" href="arch_shared.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">EA</div>
+    <span class="topnav-title">Expense AI · Architecture</span>
+  </div>
+  <div class="topnav-pages">
+    <a href="arch_01_system_overview.html">01 System</a>
+    <a href="arch_02_tech_stack.html">02 Tech Stack</a>
+    <a href="arch_03_intake_workflow.html">03 Intake</a>
+    <a href="arch_04_postsubmission.html">04 Post-Submission</a>
+    <a href="arch_05_defence.html" class="active">05 Defence</a>
+  </div>
+  <div class="topnav-badge">v1.2.0 · ap-southeast-1</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Architecture · Section 05</div>
+  <h1>Defence Layers (Spec A)</h1>
+  <p>Eight independent, layered defences spanning the web middleware, LangGraph graph node, and compliance-internal verifier — each with a single clear responsibility and a dedicated audit trail. Designed to be testable in isolation and unconditional on critical limits.</p>
+</div>
+
+<div class="container">
+
+  <!-- Layer summary cards -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">1</div>
+      <div>
+        <h2>The 8 Layers</h2>
+        <p>Where each defence lives and what it stops</p>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+
+      <div class="stack-card" style="border-top:3px solid var(--red)">
+        <div class="stack-tag tag-red">B1 · Web Middleware</div>
+        <div class="tech-name">Rate + Length Caps</div>
+        <div class="tech-detail">20 msg/min/session · message ≤2 000 chars · justification ≤500 chars · control chars rejected → 429/413</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--red)">
+        <div class="stack-tag tag-red">B2 · abuseGuard</div>
+        <div class="tech-name">Coherence Gate</div>
+        <div class="tech-detail">Min 10 chars · non-stopword ratio ≥30% · must reference known expense category or recognised reason phrase</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--red)">
+        <div class="stack-tag tag-red">B3 · Chat Router</div>
+        <div class="tech-name">Injection Firewall</div>
+        <div class="tech-detail">Strips "ignore instructions", [INST], system:, long base64 blobs. Wraps all user text in <code>&lt;user_input&gt;</code> fence</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--orange)">
+        <div class="stack-tag tag-orange2">B4 · abuseGuard</div>
+        <div class="tech-name">Cross-Check LLM</div>
+        <div class="tech-detail">One cheap LLM call (temp=0, ~150 tokens): does the justification plausibly explain this receipt? → inconsistency → requiresReview</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--gold)">
+        <div class="stack-tag tag-orange">B5 · Compliance</div>
+        <div class="tech-name">Hard Monetary Caps</div>
+        <div class="tech-detail">SGD 5 000/receipt · SGD 10 000/claim · SGD 20 000/employee/month. Deterministic — unconditional, no LLM override</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--gold)">
+        <div class="stack-tag tag-orange">B6 · Compliance</div>
+        <div class="tech-name">Self-Critique Verifier</div>
+        <div class="tech-detail">2nd LLM call, different model family, temperature 0.0, different system prompt. Disagrees → finalVerdict = requiresReview</div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--green)">
+        <div class="stack-tag tag-green">B7 · Ubiquitous</div>
+        <div class="tech-name">Audit Trail</div>
+        <div class="tech-detail">Every boundary trip writes one <code>audit_log</code> row with actor, action, details, timestamp. Available on /audit and <code>mmga logs grep</code></div>
+      </div>
+
+      <div class="stack-card" style="border-top:3px solid var(--blue)">
+        <div class="stack-tag tag-blue">B8 · Web Middleware</div>
+        <div class="tech-name">Per-User Quotas</div>
+        <div class="tech-detail">20 submissions/user/day · 5 retries/user/hr after fail verdict. Stored in <code>user_quota_usage</code> table → 429 on trip</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Defence flow diagram -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">2</div>
+      <div>
+        <h2>Defence Decision Tree</h2>
+        <p>How a message traverses each layer before reaching compliance</p>
+      </div>
+    </div>
+    <div class="diagram-card">
+      <div class="diagram-title">Left to right — every trip emits an audit row (B7)</div>
+      <div class="mermaid">
+flowchart TD
+  classDef check  fill:#1d2e45,color:#e2eaf3,stroke:#4d94ff,font-size:12px
+  classDef pass_  fill:#1a2a20,color:#b3f5d3,stroke:#36c789,font-size:12px
+  classDef fail_  fill:#2a1818,color:#ffb3b3,stroke:#e05252,font-size:12px
+  classDef cap_   fill:#2a1f00,color:#f5d89a,stroke:#f5a623,font-size:12px
+
+  IN([Inbound request]) --> B8
+
+  B8{"B8 · Per-user quota\n20/day · 5 retries/hr"}:::check
+  B8 -->|trip| QUOT["429 quota_trip"]:::fail_
+  B8 -->|ok| B1
+
+  B1{"B1 · Rate + Length\n20 msg/min · 2 000 chars"}:::check
+  B1 -->|trip| RL["429/413 rate_limit_trip"]:::fail_
+  B1 -->|ok| B3
+
+  B3{"B3 · Injection Firewall\nsanitizeUserText()"}:::check
+  B3 -->|patterns stripped| AUD1["injection_sanitized\naudit + continue"]:::cap_
+  AUD1 --> B2
+
+  B2{"B2 · Coherence Gate\nkeyword + ratio check"}:::check
+  B2 -->|incoherent| NJ["justification = absent\ncoherence_failed audit"]:::cap_
+  NJ --> B4x
+  B2 -->|coherent| B4
+
+  B4{"B4 · Cross-check LLM\nreceipt ↔ justification"}:::check
+  B4 -->|inconsistent| CM["crossCheckOk=false\ncross_check_failed audit"]:::cap_
+  CM --> B5
+  B4 -->|consistent| B5
+
+  B4x["(skip cross-check\nno justification signal)"]:::cap_ --> B5
+
+  B5{"B5 · Hard Caps\n5k / 10k / 20k SGD"}:::check
+  B5 -->|exceeded| HC["requiresDirectorApproval\nhard_cap_trip audit\n— NO LLM override"]:::fail_
+  B5 -->|within cap| COMP
+
+  COMP["compliance node\nW2 justification eval\nprimary LLM verdict"]:::check
+
+  B6{"B6 · Self-Critique\n2nd LLM temp=0"}:::check
+  COMP --> B6
+  B6 -->|disagrees| FLIP["finalVerdict=requiresReview\ncritique_flipped audit"]:::cap_
+  B6 -->|agrees| OK(["✓ Final verdict\nto advisor"]):::pass_
+  FLIP --> OK
+
+  B7(["B7 · Audit trail\nEvery trip → audit_log\nactor=abuse_guard"]):::pass_
+  B7 -.-> QUOT & RL & AUD1 & NJ & CM & HC & FLIP
+      </div>
+    </div>
+  </div>
+
+  <!-- Violation severity table -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">3</div>
+      <div>
+        <h2>Violation Severity &amp; Justification Rules (W2)</h2>
+        <p>Which violations can be flipped by a user justification, and which are unconditional</p>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Violation type</th>
+            <th>Severity class</th>
+            <th>Justification can flip?</th>
+            <th>Flip target</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Amount > cap (≤150% of cap)</td>
+            <td><span class="pill" style="color:var(--gold);border-color:var(--gold)">soft</span></td>
+            <td>✅ Yes — if coherent justification provided</td>
+            <td><code>requiresManagerApproval</code></td>
+          </tr>
+          <tr>
+            <td>Missing preferred vendor</td>
+            <td><span class="pill" style="color:var(--gold);border-color:var(--gold)">soft</span></td>
+            <td>✅ Yes</td>
+            <td><code>requiresManagerApproval</code></td>
+          </tr>
+          <tr>
+            <td>Expense outside working hours</td>
+            <td><span class="pill" style="color:var(--gold);border-color:var(--gold)">soft</span></td>
+            <td>✅ Yes</td>
+            <td><code>requiresManagerApproval</code></td>
+          </tr>
+          <tr>
+            <td>Amount 150%–B5 cap</td>
+            <td><span class="pill" style="color:var(--orange);border-color:var(--orange)">soft-plus</span></td>
+            <td>✅ Yes — with stronger justification</td>
+            <td><code>requiresDirectorApproval</code></td>
+          </tr>
+          <tr>
+            <td>Alcohol / entertainment outside allowlist</td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">hard</span></td>
+            <td>❌ Never</td>
+            <td>Verdict = <code>fail</code></td>
+          </tr>
+          <tr>
+            <td>Non-claimable category (personal, gift)</td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">hard</span></td>
+            <td>❌ Never</td>
+            <td>Verdict = <code>fail</code></td>
+          </tr>
+          <tr>
+            <td>Amount > SGD 5 000 / SGD 10 000 / SGD 20 000 (B5)</td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">hard cap</span></td>
+            <td>❌ Never — deterministic, no LLM</td>
+            <td>Auto <code>requiresDirectorApproval</code></td>
+          </tr>
+          <tr>
+            <td>Exact duplicate receipt</td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">hard</span></td>
+            <td>❌ Never</td>
+            <td>Fraud flag → escalate</td>
+          </tr>
+          <tr>
+            <td>Justification fails coherence gate (B2)</td>
+            <td><span class="pill" style="color:var(--grey);border-color:var(--grey)">absent</span></td>
+            <td>— Justification treated as not provided</td>
+            <td>No flip signal passed to compliance</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Audit actions reference -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">4</div>
+      <div>
+        <h2>Audit Actions Reference</h2>
+        <p>All <code>audit_log.action</code> values emitted by the defence layers</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Spec A boundary trips</h3></div>
+        <table>
+          <thead><tr><th>Action</th><th>Emitted by</th><th>Trigger</th></tr></thead>
+          <tbody>
+            <tr><td><code>rate_limit_trip</code></td><td>B1 middleware</td><td>Rate exceeded</td></tr>
+            <tr><td><code>length_cap_trip</code></td><td>B1 middleware</td><td>Message/justification too long</td></tr>
+            <tr><td><code>quota_trip</code></td><td>B8 middleware</td><td>Daily/hourly quota exceeded</td></tr>
+            <tr><td><code>injection_sanitized</code></td><td>B3 firewall</td><td>Pattern matched + redacted</td></tr>
+            <tr><td><code>coherence_failed</code></td><td>B2 abuseGuard</td><td>Justification incoherent</td></tr>
+            <tr><td><code>cross_check_failed</code></td><td>B4 abuseGuard</td><td>Receipt ↔ justification inconsistent</td></tr>
+            <tr><td><code>hard_cap_trip</code></td><td>B5 compliance</td><td>Monetary ceiling exceeded</td></tr>
+            <tr><td><code>critique_flipped</code></td><td>B6 compliance</td><td>Self-critique overrode primary verdict</td></tr>
+            <tr><td><code>justification_rejected</code></td><td>compliance</td><td>abuseFlags blocked justification signal</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Normal workflow events</h3></div>
+        <table>
+          <thead><tr><th>Action</th><th>Emitted by</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td><code>compliance_check_start</code></td><td>compliance</td><td>Node begins</td></tr>
+            <tr><td><code>compliance_check</code></td><td>compliance</td><td>Verdict produced</td></tr>
+            <tr><td><code>fraud_check</code></td><td>fraud</td><td>Verdict produced</td></tr>
+            <tr><td><code>advisor_decision</code></td><td>advisor</td><td>Routing decision recorded</td></tr>
+            <tr><td><code>reviewer_action</code></td><td>review router</td><td>Human approves/returns</td></tr>
+            <tr><td><code>claim_submitted</code></td><td>intake</td><td>submitClaim tool called</td></tr>
+            <tr><td><code>status_updated</code></td><td>DB MCP</td><td>Any status transition</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Expense AI · SUTD MSTR-DAIE · Multimodal Agentic GenAI</span>
+  <span>05 / 05 · Defence Layers (Spec A)</span>
+  <span>v1.2.0 · mmga.mdaie-sutd.fit</span>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true, theme: 'dark',
+  themeVariables: {
+    background: '#162032', primaryColor: '#1d2e45',
+    primaryTextColor: '#e2eaf3', primaryBorderColor: '#4d94ff',
+    lineColor: '#4a6a85', fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: '12px', clusterBkg: '#1a2030', clusterBorder: '#f5a623',
+    edgeLabelBackground: '#162032',
+  },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>02 · Tech Stack — Expense AI Architecture</title>
+<link rel="stylesheet" href="arch_shared.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">EA</div>
+    <span class="topnav-title">Expense AI · Architecture</span>
+  </div>
+  <div class="topnav-pages">
+    <a href="arch_01_system_overview.html">01 System</a>
+    <a href="arch_02_tech_stack.html" class="active">02 Tech Stack</a>
+    <a href="arch_03_intake_workflow.html">03 Intake</a>
+    <a href="arch_04_postsubmission.html">04 Post-Submission</a>
+    <a href="arch_05_defence.html">05 Defence</a>
+  </div>
+  <div class="topnav-badge">v1.2.0 · ap-southeast-1</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Architecture · Section 02</div>
+  <h1>Technology Stack</h1>
+  <p>Every framework, model, infrastructure service, and library — with rationale and key configuration details.</p>
+</div>
+
+<div class="container">
+
+  <!-- Layer diagram -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">1</div>
+      <div>
+        <h2>Stack Layers</h2>
+        <p>How the technologies relate across abstraction levels</p>
+      </div>
+    </div>
+    <div class="diagram-card">
+      <div class="diagram-title">Technology dependency layers</div>
+      <div class="mermaid">
+graph BT
+  classDef infra  fill:#1d2040,color:#b3c8ff,stroke:#4d94ff
+  classDef data   fill:#1a2a20,color:#b3f5d3,stroke:#36c789
+  classDef ai     fill:#2a1a2a,color:#c8b8ff,stroke:#9b6dff
+  classDef web    fill:#1d2e45,color:#e2eaf3,stroke:#4d94ff
+  classDef ops    fill:#1a2a1a,color:#b3f5c8,stroke:#36c789
+  classDef guard  fill:#2a1818,color:#ffb3b3,stroke:#e05252
+
+  subgraph L0["Infrastructure (AWS)"]
+    EC2["EC2 t3.medium\nAmazon Linux 2023"]:::infra
+    RDS["RDS PostgreSQL 16\ndb.t3.micro"]:::infra
+    LAM["Lambda ARM64\nFunction URLs"]:::infra
+    S3["S3 · Route53 · ACM\nEventBridge · SSM"]:::infra
+  end
+
+  subgraph L1["Data & Storage"]
+    PG["PostgreSQL 16\npsycopg3 async"]:::data
+    QDR["Qdrant\nVector Store"]:::data
+    ALM["Alembic\n013 migrations"]:::data
+    SQLA["SQLAlchemy\nAsync ORM"]:::data
+  end
+
+  subgraph L2["AI / ML Models"]
+    LLM["Qwen3-235B-A22B\nOpenRouter · 262k ctx"]:::ai
+    VLM["Gemini 2.0 Flash\nReceipt VLM · OpenRouter"]:::ai
+    EMB["all-MiniLM-L6-v2\n384-dim embeddings"]:::ai
+    FALL["Gemini 2.0 Flash Lite\n402 fallback"]:::ai
+  end
+
+  subgraph L3["Agent Framework"]
+    LG["LangGraph StateGraph\nfan-out · ReAct · checkpointer"]:::web
+    MCP["FastMCP servers\nStreamable HTTP"]:::web
+    DEEP["DeepEval\nLLM-as-Judge"]:::web
+  end
+
+  subgraph L4["Web & API"]
+    FA["FastAPI\n:8000"]:::web
+    SSE["Server-Sent Events\nstreaming UI"]:::web
+    J2["Jinja2 templates\nHTMX · Alpine.js"]:::web
+  end
+
+  subgraph L5["Defence (Spec A)"]
+    RG["RequestGuardMiddleware\nB1 rate · B8 quotas"]:::guard
+    SF["securityFirewall\nB3 injection fence"]:::guard
+    ABSG["abuseGuardNode\nB2·B4·B5·B6·B7"]:::guard
+  end
+
+  L0 --> L1 --> L2 --> L3 --> L4
+  L5 --> L4
+  L3 --> L5
+      </div>
+    </div>
+  </div>
+
+  <!-- Stack cards -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">2</div>
+      <div>
+        <h2>Component Details</h2>
+        <p>Every technology, its version, and key configuration</p>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange">Orchestration</div>
+        <div class="tech-name">LangGraph StateGraph</div>
+        <div class="tech-detail">
+          Manages 7-node agent graph with conditional branching, parallel fan-out, and interrupt support.
+          <code>AsyncPostgresSaver</code> checkpointer persists <code>ClaimState</code> after every node.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange">LLM · Reasoning</div>
+        <div class="tech-name">Qwen3-235B-A22B-2507</div>
+        <div class="tech-detail">
+          Primary model for compliance, fraud, and advisor agents via OpenRouter.
+          262k token context window. Fallback: <code>Gemini 2.0 Flash Lite</code> on 402 error.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange">VLM · Vision</div>
+        <div class="tech-name">Gemini 2.0 Flash</div>
+        <div class="tech-detail">
+          Receipt image → structured JSON fields (merchant, date, amount, currency, category) with per-field confidence scores. Base64-encoded; no separate OCR pipeline.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange">API Gateway</div>
+        <div class="tech-name">OpenRouter</div>
+        <div class="tech-detail">
+          Single endpoint for both LLM + VLM. Enables runtime model switching, 402 fallback, and cost monitoring. Accessed via OpenAI-compatible SDK.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-blue">Web Framework</div>
+        <div class="tech-name">FastAPI + Jinja2</div>
+        <div class="tech-detail">
+          Server-rendered HTML templates. Server-Sent Events for real-time agent streaming. HTMX for partial page updates. Alpine.js for lightweight interactivity.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-blue">MCP Protocol</div>
+        <div class="tech-name">FastMCP (Streamable HTTP)</div>
+        <div class="tech-detail">
+          4 MCP servers exposing tools to agents. MCP spec 2025-03-26. Health check: 406 on bare GET. mcp-rag on EC2; mcp-db, mcp-currency, mcp-email on Lambda.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-green">Database</div>
+        <div class="tech-name">PostgreSQL 16</div>
+        <div class="tech-detail">
+          Claims, receipts, audit_log, users, eval_runs, eval_judgments, user_quota_usage.
+          Async <code>psycopg3</code> driver. 12 Alembic migrations (013 head).
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-green">Vector Store</div>
+        <div class="tech-name">Qdrant</div>
+        <div class="tech-detail">
+          <code>expense_policies</code> collection. ~35 chunks from 5 policy Markdown files. 384-dim cosine similarity. Embedded with <code>all-MiniLM-L6-v2</code> (sentence-transformers).
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-green">ORM</div>
+        <div class="tech-name">SQLAlchemy + Alembic</div>
+        <div class="tech-detail">
+          Async mapped ORM (CamelCase Python attributes → snake_case DB columns). All schema changes via Alembic migrations. 013 revision = current head.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange2">Compute</div>
+        <div class="tech-name">EC2 t3.medium</div>
+        <div class="tech-detail">
+          Amazon Linux 2023. Hosts FastAPI app, Qdrant, MCP-RAG, Seq. Docker Compose. 30 GB NVMe. EventBridge nightly reboot 04:00 SGT.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange2">Serverless</div>
+        <div class="tech-name">AWS Lambda ARM64</div>
+        <div class="tech-detail">
+          mcp-db, mcp-currency, mcp-email deployed as ARM64 Lambda functions with Function URLs. Offloads stateless MCP processing from EC2.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-orange2">Storage</div>
+        <div class="tech-name">RDS PostgreSQL 16</div>
+        <div class="tech-detail">
+          db.t3.micro · 20 GB SSD · private subnet. Claims database, LangGraph checkpointer, audit log. Accessible only from EC2 security group.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-red">Input Defence</div>
+        <div class="tech-name">8-Layer AbuseGuard (Spec A)</div>
+        <div class="tech-detail">
+          B1 rate+length · B2 coherence gate · B3 injection firewall · B4 cross-check LLM · B5 hard monetary caps · B6 self-critique verifier · B7 audit trail · B8 per-user quotas.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-purple">Evaluation</div>
+        <div class="tech-name">DeepEval + /llmasjudge</div>
+        <div class="tech-detail">
+          20 benchmarks across Classification, Extraction, Reasoning, Safety, Workflow. GEval + HallucinationMetric. Self-consistency (3 runs), cross-modal, verifier-judge disagreement analysis.
+        </div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-tag tag-green">Ops</div>
+        <div class="tech-name">EventBridge + SSM + mmga CLI</div>
+        <div class="tech-detail">
+          Nightly reboot via EventBridge cron. SSH-free ops via SSM Run Command. Custom <code>./mmga</code> CLI for deploy, log tailing, env management, and health checks.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Model comparison table -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">3</div>
+      <div>
+        <h2>Model Routing</h2>
+        <p>Which model is called at each stage and why</p>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th>Primary model</th>
+            <th>Fallback</th>
+            <th>Temperature</th>
+            <th>Why this model</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Receipt extraction (VLM)</td>
+            <td><code>gemini-2.0-flash-001</code></td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>0.0</td>
+            <td>Low latency multimodal; accurate structured JSON from images</td>
+          </tr>
+          <tr>
+            <td>Intake ReAct reasoning</td>
+            <td><code>qwen3-235b-a22b-2507</code></td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>0.3</td>
+            <td>Large context (262k) for long conversations; strong tool-call adherence</td>
+          </tr>
+          <tr>
+            <td>Compliance evaluation</td>
+            <td><code>qwen3-235b-a22b-2507</code></td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>0.1</td>
+            <td>Deterministic verdict; needs precise policy citation</td>
+          </tr>
+          <tr>
+            <td>B6 Self-critique verifier</td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>same</td>
+            <td>0.0</td>
+            <td>Different model family → independent bias; cheap per-call</td>
+          </tr>
+          <tr>
+            <td>Fraud anomaly detection</td>
+            <td><code>qwen3-235b-a22b-2507</code></td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>0.1</td>
+            <td>Statistical context requires reasoning over JSON history</td>
+          </tr>
+          <tr>
+            <td>Advisor routing decision</td>
+            <td><code>qwen3-235b-a22b-2507</code></td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>0.2</td>
+            <td>Reflection over compliance + fraud; needs policy citations</td>
+          </tr>
+          <tr>
+            <td>B4 Cross-check (AbuseGuard)</td>
+            <td><code>gemini-2.0-flash-lite-001</code></td>
+            <td>same</td>
+            <td>0.0</td>
+            <td>Cheap, fast, ~150 token call; different family from main LLM</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Expense AI · SUTD MSTR-DAIE · Multimodal Agentic GenAI</span>
+  <span>02 / 05 · Tech Stack</span>
+  <span>v1.2.0 · mmga.mdaie-sutd.fit</span>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true, theme: 'dark',
+  themeVariables: {
+    background: '#162032', primaryColor: '#1d2e45',
+    primaryTextColor: '#e2eaf3', primaryBorderColor: '#4d94ff',
+    lineColor: '#4a6a85', clusterBkg: '#1a2030',
+    clusterBorder: '#f5a623',
+    fontFamily: 'Inter, system-ui, sans-serif', fontSize: '13px',
+  },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
+</script>
+</body>
+</html>

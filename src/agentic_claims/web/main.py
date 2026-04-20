@@ -32,8 +32,8 @@ from agentic_claims.web.routers.review import router as reviewRouter
 logger = logging.getLogger(__name__)
 
 # Paths that do not require authentication
-_PUBLIC_PATHS = {"/login", "/logout", "/llmasjudge"}
-_PUBLIC_PREFIXES = ("/static/", "/llmasjudge/")
+_PUBLIC_PATHS = {"/login", "/logout", "/llmasjudge", "/architecture"}
+_PUBLIC_PREFIXES = ("/static/", "/llmasjudge/", "/architecture/")
 # API/SSE paths return 401 JSON instead of 302 redirect (prevents EventSource loops)
 _API_PREFIXES = ("/chat/", "/api/")
 
@@ -152,6 +152,11 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory=str(projectRoot / "static")), name="static")
+app.mount(
+    "/architecture",
+    StaticFiles(directory=str(projectRoot / "static" / "architecture"), html=True),
+    name="architecture",
+)
 
 app.include_router(authRouter)
 app.include_router(chatRouter)

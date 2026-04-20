@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>01 · System Overview — Expense AI Architecture</title>
+<link rel="stylesheet" href="arch_shared.css"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">EA</div>
+    <span class="topnav-title">Expense AI · Architecture</span>
+  </div>
+  <div class="topnav-pages">
+    <a href="arch_01_system_overview.html" class="active">01 System</a>
+    <a href="arch_02_tech_stack.html">02 Tech Stack</a>
+    <a href="arch_03_intake_workflow.html">03 Intake</a>
+    <a href="arch_04_postsubmission.html">04 Post-Submission</a>
+    <a href="arch_05_defence.html">05 Defence</a>
+  </div>
+  <div class="topnav-badge">v1.2.0 · ap-southeast-1</div>
+</nav>
+
+<div class="hero">
+  <div class="hero-eyebrow">Architecture · Section 01</div>
+  <h1>System Overview</h1>
+  <p>Four-layer multi-agent pipeline orchestrated by LangGraph, integrating VLM receipt extraction, RAG-based policy validation, parallel compliance and fraud detection, and risk-based routing — backed by four MCP servers and deployed on AWS.</p>
+</div>
+
+<div class="container">
+
+  <!-- Metrics row -->
+  <div class="section">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px">
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--gold)">7</div>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px">LangGraph Nodes</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--blue)">4</div>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px">MCP Servers</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--green)">8</div>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px">Defence Layers</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--purple)">3</div>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px">Modalities</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div style="font-size:28px;font-weight:800;color:var(--orange)">20</div>
+          <div style="font-size:12px;color:var(--grey);margin-top:4px">Eval Benchmarks</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full system diagram -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">1</div>
+      <div>
+        <h2>Full System Architecture</h2>
+        <p>Components, layers, and data flows</p>
+      </div>
+    </div>
+
+    <div class="diagram-card">
+      <div class="diagram-title">End-to-end agent pipeline</div>
+      <div class="mermaid">
+graph TB
+  classDef user   fill:#2a1f4a,color:#c8b8ff,stroke:#9b6dff,stroke-width:1.5px
+  classDef web    fill:#1d2e45,color:#e2eaf3,stroke:#4d94ff,stroke-width:1.5px
+  classDef guard  fill:#2a1818,color:#ffb3b3,stroke:#e05252,stroke-width:1.5px
+  classDef agent  fill:#1d2a3a,color:#e2eaf3,stroke:#4d94ff,stroke-width:1.5px
+  classDef mcp    fill:#1a2a20,color:#b3f5d3,stroke:#36c789,stroke-width:1.5px
+  classDef lambda fill:#2a1e0a,color:#f5c87a,stroke:#e07a30,stroke-width:1.5px
+  classDef rds    fill:#1a2040,color:#b3c8ff,stroke:#4d94ff,stroke-width:1.5px
+  classDef ext    fill:#1a1a1a,color:#999,stroke:#444,stroke-width:1px,stroke-dasharray:4 2
+  classDef ctrl   fill:#1a2a1a,color:#b3f5c8,stroke:#36c789,stroke-width:1px,stroke-dasharray:4 2
+
+  C([👤 Claimant]):::user
+  R([👤 Reviewer]):::user
+
+  subgraph WEB["  Web Layer  ·  FastAPI · Jinja2 · SSE  "]
+    MW["Request Guard + Injection Firewall\nB1 Rate/Length  ·  B3 Prompt-Injection Fence"]:::guard
+    CH["Chat Router\nSSE streaming"]:::web
+    AU["Auth Middleware\nSession · RBAC roles"]:::web
+    PG["Dashboard · Review\nHealth · Logs · /llmasjudge"]:::web
+  end
+
+  subgraph GRAPH["  LangGraph StateGraph  ·  AsyncPostgresSaver checkpointer  "]
+    PRE["preIntakeValidator\nInput sanitise"]:::guard
+    IN["intake_gpt\n6 tools · ReAct subgraph"]:::agent
+    AG["abuseGuard\nB2–B6 defence layers"]:::guard
+    PS["postSubmission\nFan-out gate"]:::agent
+    CO["compliance\nEvaluator + W2 + B6 self-critique"]:::agent
+    FR["fraud\nTool Call + Rules"]:::agent
+    MR["markAiReviewed"]:::agent
+    AD["advisor\nReflection + Routing"]:::agent
+  end
+
+  subgraph MCP["  MCP Servers  ·  Streamable HTTP  "]
+    RAG["MCP-RAG\nQdrant · :8001"]:::mcp
+    DBm["MCP-DB\nPostgreSQL · Lambda"]:::lambda
+    CUR["MCP-Currency\nFrankfurter · Lambda"]:::lambda
+    EML["MCP-Email\nSMTP · Lambda"]:::lambda
+  end
+
+  subgraph INFRA["  Infrastructure (AWS ap-southeast-1)  "]
+    RDS[("RDS PostgreSQL 16\ndb.t3.micro")]:::rds
+    QD["Qdrant\nVector store"]:::mcp
+    S3["S3 Deploy"]:::ctrl
+  end
+
+  OR["☁ OpenRouter\nQwen3-235B · Gemini 2.0 Flash"]:::ext
+  FX["☁ Frankfurter API"]:::ext
+  SM["☁ SMTP"]:::ext
+
+  C & R -->|HTTPS| MW
+  MW --> CH & AU & PG
+  CH --> PRE --> IN
+  IN -->|submitted| AG
+  IN -->|pending| IN
+  AG --> PS
+  PS --> CO & FR
+  CO & FR --> MR --> AD
+  IN & CO & AD --> RAG
+  IN --> CUR & DBm
+  FR & AD --> DBm
+  AD --> EML
+  RAG --> QD
+  DBm --> RDS
+  CUR --> FX
+  EML --> SM
+  IN & CO & FR & AD -->|LLM/VLM| OR
+  GRAPH -->|checkpointer| RDS
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#9b6dff"></div>User persona</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4d94ff"></div>FastAPI web layer</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e05252"></div>Guard / defence</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4d94ff;opacity:.6"></div>LangGraph agent</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#36c789"></div>MCP server (EC2)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#e07a30"></div>Lambda (serverless)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4d94ff;opacity:.3"></div>RDS / infrastructure</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#444"></div>External API</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent roles table -->
+  <div class="section">
+    <div class="section-label">
+      <div class="num">2</div>
+      <div>
+        <h2>Agent Roles</h2>
+        <p>Pattern, persona, and responsibility for each node</p>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Pattern</th>
+            <th>Serves</th>
+            <th>Key responsibility</th>
+            <th>MCP tools</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>preIntakeValidator</code></td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">Guard</span></td>
+            <td>System</td>
+            <td>Input sanitisation before intake receives the message</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><code>intake_gpt</code></td>
+            <td><span class="pill" style="color:var(--blue);border-color:var(--blue)">ReAct</span></td>
+            <td>Claimant</td>
+            <td>Receipt extraction, policy pre-validation, currency conversion, justification collection, claim submission</td>
+            <td>RAG · DB · Currency</td>
+          </tr>
+          <tr>
+            <td><code>abuseGuard</code></td>
+            <td><span class="pill" style="color:var(--red);border-color:var(--red)">Guard + Eval</span></td>
+            <td>System</td>
+            <td>8-layer defence: coherence, cross-check, hard caps, self-critique, audit trail</td>
+            <td>DB (audit)</td>
+          </tr>
+          <tr>
+            <td><code>compliance</code></td>
+            <td><span class="pill" style="color:var(--gold);border-color:var(--gold)">Evaluator</span></td>
+            <td>System</td>
+            <td>Policy evaluation with W2 justification semantics and B6 self-critique verifier</td>
+            <td>RAG · DB</td>
+          </tr>
+          <tr>
+            <td><code>fraud</code></td>
+            <td><span class="pill" style="color:var(--orange);border-color:var(--orange)">Tool + Rules</span></td>
+            <td>System</td>
+            <td>3 targeted DB queries → rule-based duplicate short-circuit → LLM anomaly detection</td>
+            <td>DB</td>
+          </tr>
+          <tr>
+            <td><code>advisor</code></td>
+            <td><span class="pill" style="color:var(--green);border-color:var(--green)">Reflection</span></td>
+            <td>Reviewer</td>
+            <td>Synthesise findings → auto_approve / return_to_claimant / escalate_to_reviewer + email</td>
+            <td>RAG · DB · Email</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  <span>Expense AI · SUTD MSTR-DAIE · Multimodal Agentic GenAI</span>
+  <span>01 / 05 · System Overview</span>
+  <span>v1.2.0 · mmga.mdaie-sutd.fit</span>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true, theme: 'dark',
+  themeVariables: {
+    background: '#162032', primaryColor: '#1d2e45',
+    primaryTextColor: '#e2eaf3', primaryBorderColor: '#4d94ff',
+    lineColor: '#4a6a85', secondaryColor: '#162032',
+    clusterBkg: '#1a2030', clusterBorder: '#f5a623',
+    fontFamily: 'Inter, system-ui, sans-serif', fontSize: '13px',
+    edgeLabelBackground: '#162032',
+  },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis', padding: 20 },
+});
+</script>
+</body>
+</html>
