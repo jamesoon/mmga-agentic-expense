@@ -216,3 +216,88 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PROJECT-SPECIFIC  (mmga-agentic-expense)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── Secrets & credentials ──────────────────────────────────────────────
+# Real env files (templates with .example suffix are explicitly allowed above)
+.env.*
+!.env.example
+!.env.prod.example
+!.env.eval.example
+.envrc
+.secrets
+.secrets.*
+**/.secrets
+infra/.secrets
+eval/.env
+# SSH keys / certs / IAM credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials
+credentials.*
+.aws/credentials
+.aws/config
+aws-credentials.*
+# Tokens / API keys scratch files
+*.token
+.api_keys
+
+# ─── Claude Code / AI tooling (entire tree) ──────────────────────────────
+.claude/
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.cursorrules
+.continuerc
+
+# ─── Project memory, planning & internal specs ───────────────────────────
+.planning/
+docs/superpowers/
+docs/project_notes/
+docs/project-context.md
+docs/ux/
+MEMORY.md
+MERGE_MANIFEST.md
+
+# ─── AWS deployment state (must not ship resource IDs) ───────────────────
+scripts/aws/.deploy-state
+scripts/aws/.state
+infra/.deploy-state
+
+# ─── Runtime / generated outputs ─────────────────────────────────────────
+logs/
+!logs/.gitkeep
+*.log
+eval/results/
+eval/cache/
+artifacts/
+static/uploads/
+.chainlit/history/
+.playwright-mcp/
+.qa/
+project-reports/
+
+# ─── Local dev scratch ───────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+scratch/
+tmp/
+tmp_*/
+.debug/
+
+# ─── Repo-local CLI wrappers that hard-code prod endpoints ───────────────
+# mmga CLI contains the live EC2 public IP and internal paths — keep out.
+mmga
+
+# ─── Spec B local build artefacts (if any) ───────────────────────────────
+/dist
+/build
+node_modules/
