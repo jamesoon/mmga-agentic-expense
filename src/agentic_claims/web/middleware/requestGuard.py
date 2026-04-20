@@ -34,6 +34,18 @@ _SAFE_CHAR_RANGES = [
 
 _BODY_METHODS = {"POST", "PUT", "PATCH"}
 
+# Paths that are NEVER rate-limited by B1 (static assets, health checks,
+# documentation pages). These are cheap / stateless and have no LLM cost.
+_NO_RATE_LIMIT_PREFIXES = (
+    "/static/",
+    "/architecture/",
+    "/favicon",
+    "/health",
+    "/llmasjudge/summary",
+    "/llmasjudge/runs",
+    "/llmasjudge/analyses",
+)
+
 
 def _isSafeChar(ch: str) -> bool:
     cp = ord(ch)
@@ -72,8 +84,16 @@ class RequestGuardMiddleware:
         client = scope.get("client") or (None, None)
         sessionKey = client[0] if client and client[0] else "anon"
         method: str = scope.get("method", "GET")
+        path: str = scope.get("path", "")
 
-        # ── B1: rate-limit every HTTP request by client host ────────────
+        # Skip rate-limit entirely for static assets, docs, and read-only API
+        # polling endpoints. GETs for pages are also exempt — only body-bearing
+        # methods (POST/PUT/PATCH) need rate-limiting.
+        if any(path.startswith(p) for p in _NO_RATE_LIMIT_PREFIXES) or method == "GET":
+            await self.app(scope, receive, send)
+            return
+
+        # ── B1: rate-limit body-bearing requests by client host ─────────
         now = time.time()
         window = self._sessionHits[sessionKey]
         while window and now - window[0] > 60:

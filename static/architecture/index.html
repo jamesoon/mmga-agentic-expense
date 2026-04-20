@@ -95,7 +95,7 @@ graph TB
   C([👤 Claimant]):::user
   R([👤 Reviewer]):::user
 
-  subgraph WEB["  Web Layer  ·  FastAPI · Jinja2 · SSE  "]
+  subgraph WEB["  Web Layer  ·  FastAPI · Jinja2 · SSE  ·  mmga.mdaie-sutd.fit  "]
     MW["Request Guard + Injection Firewall\nB1 Rate/Length  ·  B3 Prompt-Injection Fence"]:::guard
     CH["Chat Router\nSSE streaming"]:::web
     AU["Auth Middleware\nSession · RBAC roles"]:::web
@@ -114,10 +114,10 @@ graph TB
   end
 
   subgraph MCP["  MCP Servers  ·  Streamable HTTP  "]
-    RAG["MCP-RAG\nQdrant · :8001"]:::mcp
-    DBm["MCP-DB\nPostgreSQL · Lambda"]:::lambda
-    CUR["MCP-Currency\nFrankfurter · Lambda"]:::lambda
-    EML["MCP-Email\nSMTP · Lambda"]:::lambda
+    RAG["MCP-RAG\nQdrant semantic search\n(EC2 container)"]:::mcp
+    DBm["MCP-DB\nPostgreSQL CRUD\n(AWS Lambda URL)"]:::lambda
+    CUR["MCP-Currency\nFrankfurter API\n(AWS Lambda URL)"]:::lambda
+    EML["MCP-Email\nSMTP notifications\n(AWS Lambda URL)"]:::lambda
   end
 
   subgraph INFRA["  Infrastructure (AWS ap-southeast-1)  "]
