@@ -3,8 +3,10 @@
 import json
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Form
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select, text, update
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
@@ -502,7 +504,17 @@ async def receiptImageApi(request: Request, claimId: int):
     if not imagePath:
         return JSONResponse({"error": "No receipt image found"}, status_code=404)
 
-    # Redirect to static URL if path is relative
-    if not imagePath.startswith("/"):
-        return RedirectResponse(f"/static/{imagePath}", status_code=302)
-    return RedirectResponse(imagePath, status_code=302)
+    # Strip leading "uploads/" prefix to get bare filename
+    filename = Path(imagePath).name
+
+    # Check writable volume first (/data/uploads, Docker bind mount)
+    dataPath = Path("/data/uploads") / filename
+    if dataPath.exists():
+        return FileResponse(str(dataPath), media_type="image/jpeg")
+
+    # Fallback: static/uploads (local dev)
+    staticPath = Path("/app/static/uploads") / filename
+    if staticPath.exists():
+        return FileResponse(str(staticPath), media_type="image/jpeg")
+
+    return JSONResponse({"error": "Receipt image file not found"}, status_code=404)

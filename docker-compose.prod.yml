@@ -17,7 +17,10 @@ services:
     env_file:
       - .env.prod
     environment:
-      POSTGRES_HOST: ${RDS_ENDPOINT}
+      # POSTGRES_HOST comes from .env.prod (set to RDS endpoint). Do NOT override
+      # with ${RDS_ENDPOINT} here — if the shell var is unset during recreate,
+      # it silently expands to "" and psycopg falls back to /var/run/postgresql,
+      # which caused two recurring outages (2026-04-20, 2026-04-22).
       POSTGRES_PORT: "5432"
       QDRANT_HOST: qdrant
       RAG_MCP_URL: http://mcp-rag:8000/mcp/
@@ -31,6 +34,8 @@ services:
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
+      - ./uploads:/data/uploads
+      - ./eval:/app/eval:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 10s
