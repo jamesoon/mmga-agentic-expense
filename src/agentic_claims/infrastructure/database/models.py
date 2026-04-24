@@ -190,6 +190,9 @@ class User(Base):
     createdAt: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()"), name="created_at"
     )
+    email: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, name="email"
+    )
 
 
 class UserQuotaUsage(Base):
