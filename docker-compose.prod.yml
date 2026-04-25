@@ -1,13 +1,8 @@
-# Production Docker Compose — runs on EC2 free-tier instance.
-#
-# Services on EC2:  app, qdrant, mcp-rag
-# Services on AWS:  RDS PostgreSQL, Lambda (mcp-db, mcp-currency, mcp-email)
-#
-# The app connects to Lambda Function URLs for mcp-db, mcp-currency, mcp-email
-# via env vars DB_MCP_URL, CURRENCY_MCP_URL, EMAIL_MCP_URL set in .env.prod.
+# Production Docker Compose — all 7 services on EC2 with memory limits.
+# Total cap: ~2.8 GB containers + ~750 MB OS = ~3.5 GB (target ≤ 4 GB).
 #
 # Usage:
-#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
 services:
   app:
@@ -24,18 +19,27 @@ services:
       POSTGRES_PORT: "5432"
       QDRANT_HOST: qdrant
       RAG_MCP_URL: http://mcp-rag:8000/mcp/
-      # DB_MCP_URL, CURRENCY_MCP_URL, EMAIL_MCP_URL come from .env.prod
-      # (Lambda Function URLs injected by deploy script)
+      DB_MCP_URL: http://mcp-db:8000/mcp/
+      CURRENCY_MCP_URL: http://mcp-currency:8000/mcp/
+      EMAIL_MCP_URL: http://mcp-email:8000/mcp/
     depends_on:
       qdrant:
         condition: service_healthy
       mcp-rag:
+        condition: service_healthy
+      mcp-db:
+        condition: service_healthy
+      mcp-currency:
+        condition: service_healthy
+      mcp-email:
         condition: service_healthy
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
       - ./uploads:/data/uploads
       - ./eval:/app/eval:ro
+    mem_limit: 768m
+    memswap_limit: 768m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 10s
@@ -55,6 +59,8 @@ services:
       - "127.0.0.1:6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    mem_limit: 256m
+    memswap_limit: 256m
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/6333' || exit 1"]
       interval: 5s
@@ -79,6 +85,8 @@ services:
       - ./scripts:/app/scripts:ro
       - ./src/agentic_claims/policy:/app/policy:ro
       - hf_cache:/root/.cache/huggingface
+    mem_limit: 1g
+    memswap_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://127.0.0.1:8000/mcp | grep -qE '^[0-9]+$'"]
       interval: 5s
@@ -86,6 +94,72 @@ services:
       retries: 10
       start_period: 90s
     restart: unless-stopped
+
+  mcp-db:
+    build: ./mcp_servers/db
+    environment:
+      FASTMCP_HOST: 0.0.0.0
+      DATABASE_URL: postgresql://agentic:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/agentic_claims
+    env_file:
+      - .env.prod
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://127.0.0.1:8000/mcp | grep -qE '^[0-9]+$'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  mcp-currency:
+    build: ./mcp_servers/currency
+    environment:
+      FASTMCP_HOST: 0.0.0.0
+    mem_limit: 256m
+    memswap_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://127.0.0.1:8000/mcp | grep -qE '^[0-9]+$'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  mcp-email:
+    build: ./mcp_servers/email
+    environment:
+      FASTMCP_HOST: 0.0.0.0
+      SMTP_HOST: email-smtp.ap-southeast-1.amazonaws.com
+      SMTP_PORT: "587"
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    env_file:
+      - .env.prod
+    mem_limit: 128m
+    memswap_limit: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -so /dev/null -w '%{http_code}' http://127.0.0.1:8000/mcp | grep -qE '^[0-9]+$'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   qdrant_data:
