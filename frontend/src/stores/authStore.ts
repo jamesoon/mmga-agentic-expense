@@ -65,6 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (username, password) => {
     set({ loading: true, error: null })
     try {
+      try { await signOut() } catch { /* no active session — ignore */ }
       await signIn({ username, password })
       const session = await fetchAuthSession()
       const idToken = session.tokens?.idToken
