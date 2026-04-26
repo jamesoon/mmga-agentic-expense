@@ -37,7 +37,7 @@
         <p class="text-on-surface-variant font-body">Bulk review and manage expense claims.</p>
       </div>
       <a href="/dashboard"
-         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-all text-sm font-medium">
+         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-all text-sm font-medium">
         <span class="material-symbols-outlined text-base">arrow_back</span>
         Back to Dashboard
       </a>
@@ -51,7 +51,7 @@
       <div class="flex flex-col gap-1.5 min-w-40">
         <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Status</label>
         <select name="status"
-                class="bg-surface-bright border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
+                class="bg-surface-bright border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
           <option value="" {% if not filterStatus %}selected{% endif %}>All Statuses</option>
           <option value="pending" {% if filterStatus == "pending" %}selected{% endif %}>Pending</option>
           <option value="ai_reviewed" {% if filterStatus == "ai_reviewed" %}selected{% endif %}>AI Reviewed</option>
@@ -67,7 +67,7 @@
       <div class="flex flex-col gap-1.5 min-w-40">
         <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Category</label>
         <select name="category"
-                class="bg-surface-bright border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
+                class="bg-surface-bright border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
           <option value="" {% if not filterCategory %}selected{% endif %}>All Categories</option>
           <option value="Meals" {% if filterCategory == "Meals" %}selected{% endif %}>Meals</option>
           <option value="Transport" {% if filterCategory == "Transport" %}selected{% endif %}>Transport</option>
@@ -81,14 +81,14 @@
       <div class="flex flex-col gap-1.5 min-w-36">
         <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">From</label>
         <input type="date" name="dateFrom" value="{{ filterDateFrom }}"
-               class="bg-surface-bright border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
+               class="bg-surface-bright border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
       </div>
 
       <!-- Date To -->
       <div class="flex flex-col gap-1.5 min-w-36">
         <label class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">To</label>
         <input type="date" name="dateTo" value="{{ filterDateTo }}"
-               class="bg-surface-bright border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
+               class="bg-surface-bright border border-outline-variant/20 rounded-xl px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-colors">
       </div>
 
       <!-- Apply Button -->
@@ -100,7 +100,7 @@
       <!-- Clear Button (only shown when filters active) -->
       {% if filterStatus or filterCategory or filterDateFrom or filterDateTo %}
       <a href="/manage"
-         class="px-5 py-2.5 rounded-xl bg-surface-bright border border-outline-variant text-on-surface-variant hover:text-on-surface transition-colors text-sm font-medium">
+         class="px-5 py-2.5 rounded-xl bg-surface-bright border border-outline-variant/20 text-on-surface-variant hover:text-on-surface transition-colors text-sm font-medium">
         Clear
       </a>
       {% endif %}
@@ -135,7 +135,7 @@
         <tbody class="divide-y divide-outline-variant/5">
           {% if claims %}
             {% for claim in claims %}
-            <tr class="hover:bg-surface-dim transition-colors group cursor-pointer"
+            <tr class="hover:bg-surface-bright/50 transition-colors group cursor-pointer"
                 onclick="window.location.href='/review/{{ claim.id }}'">
               <td class="px-6 py-5" onclick="event.stopPropagation()">
                 <input type="checkbox" class="claim-checkbox w-4 h-4 rounded border border-outline-variant/40 bg-surface-bright cursor-pointer accent-primary"
@@ -226,7 +226,7 @@
 
   <!-- Bulk Action Bar (fixed at bottom, shown when items selected) -->
   <div x-show="selectedIds.length > 0" x-cloak
-       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-4 bg-white border border-outline-variant rounded-2xl shadow-xl">
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-4 bg-[#0f1930] border border-outline-variant/20 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)]">
     <span class="text-sm text-on-surface font-medium">
       <span class="font-bold text-primary" x-text="selectedIds.length"></span> claim<span x-show="selectedIds.length !== 1">s</span> selected
     </span>

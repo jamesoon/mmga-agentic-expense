@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,31 +7,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/output.css">
-  <style>
-    :root,:host{
-      --color-surface:#ffffff;--color-surface-dim:#f1f5f9;--color-surface-bright:#f8fafc;
-      --color-surface-variant:#f1f5f9;--color-surface-container:#f8fafc;
-      --color-surface-container-low:#f1f5f9;--color-surface-container-high:#e2e8f0;
-      --color-surface-container-highest:#e2e8f0;--color-surface-container-lowest:#ffffff;
-      --color-background:#f1f5f9;--color-on-background:#0f172a;
-      --color-on-surface:#0f172a;--color-on-surface-variant:#64748b;
-      --color-primary:#2563eb;--color-primary-dim:#1d4ed8;
-      --color-primary-fixed:#eff6ff;--color-primary-fixed-dim:#dbeafe;
-      --color-primary-container:#dbeafe;--color-on-primary:#ffffff;
-      --color-on-primary-container:#1e3a8a;--color-on-primary-fixed:#1e40af;
-      --color-secondary:#0ea5e9;--color-secondary-dim:#0284c7;
-      --color-secondary-fixed:#e0f2fe;--color-secondary-container:#e0f2fe;
-      --color-on-secondary:#ffffff;--color-on-secondary-container:#0c4a6e;
-      --color-tertiary:#7c3aed;--color-tertiary-container:#ede9fe;
-      --color-on-tertiary:#ffffff;--color-on-tertiary-container:#2e1065;
-      --color-outline:#94a3b8;--color-outline-variant:#e2e8f0;
-      --color-error:#dc2626;--color-error-container:#fee2e2;
-      --color-on-error:#ffffff;--color-on-error-container:#7f1d1d;
-      --color-inverse-surface:#0f172a;--color-inverse-on-surface:#f8fafc;
-      --color-surface-tint:#2563eb;
-    }
-    .glass-panel,.glass-card{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;border:1px solid #e2e8f0;}
-  </style>
   <script src="/static/js/htmx.min.js"></script>
   <script src="/static/js/sse.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -40,25 +15,25 @@
 <body class="bg-surface text-on-surface font-body selection:bg-secondary/30">
 
 <!-- TopNavBar -->
-<header class="fixed top-0 w-full z-50 flex justify-between items-center px-8 h-16 bg-white border-b border-outline-variant shadow-sm">
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-8 h-16 bg-[#060e20] shadow-[0_20px_40px_rgba(0,0,0,0.4)]">
   <div class="flex items-center gap-8">
     <div class="flex items-center gap-2">
       <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center">
         <span class="material-symbols-outlined text-on-primary text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
       </div>
-      <span class="text-xl font-bold text-on-surface font-manrope tracking-tight">Expense AI</span>
+      <span class="text-xl font-bold bg-gradient-to-r from-[#cc97ff] to-[#62fae3] bg-clip-text text-transparent font-manrope tracking-tight">Expense AI</span>
     </div>
   </div>
   <div class="flex items-center gap-4">
     <!-- Profile avatar with logout dropdown (Alpine.js) -->
     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
       <button @click="open = !open"
-              class="h-9 w-9 rounded-full flex items-center justify-center bg-primary text-white text-xs font-bold hover:bg-primary-dim transition-colors shadow-sm">
+              class="h-8 w-8 rounded-full border border-outline-variant/30 flex items-center justify-center bg-[#192540] text-[#dee5ff] text-xs font-bold hover:border-secondary/50 transition-colors">
         {{ (displayName or 'EA')[:2] | upper }}
       </button>
       <div x-show="open" x-cloak
-           class="absolute right-0 mt-2 w-52 rounded-xl bg-white border border-outline-variant shadow-lg z-50 overflow-hidden">
-        <div class="px-4 py-3 border-b border-outline-variant">
+           class="absolute right-0 mt-2 w-52 rounded-xl bg-[#0f1930] border border-outline-variant/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-50 overflow-hidden">
+        <div class="px-4 py-3 border-b border-outline-variant/10">
           <p class="text-on-surface text-sm font-semibold font-manrope">{{ displayName or '' }}</p>
           <p class="text-on-surface-variant text-xs capitalize mt-0.5">{{ userRole or '' }}</p>
         </div>
@@ -73,10 +48,10 @@
 </header>
 
 <!-- SideNavBar -->
-<aside class="fixed left-0 top-0 h-full flex flex-col py-8 bg-[#1e293b] w-64 hidden md:flex z-40">
+<aside class="fixed left-0 top-0 h-full flex flex-col py-8 bg-[#091328] w-64 hidden md:flex z-40">
   <div class="px-6 mb-10 mt-16">
     <button hx-post="/chat/reset" hx-swap="none" hx-confirm="Start a new expense? Current chat history will be cleared."
-            class="w-full py-3 px-4 rounded-xl bg-primary text-white font-bold text-sm transition-all hover:bg-primary-dim active:scale-95 flex items-center justify-center gap-2 shadow-sm">
+            class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-dim text-on-primary font-bold text-sm transition-all hover:shadow-[0_0_20px_rgba(204,151,255,0.4)] active:scale-95 flex items-center justify-center gap-2">
       <span class="material-symbols-outlined text-sm">add</span>
       New Expense
     </button>
@@ -84,25 +59,25 @@
   <nav class="flex-1 space-y-1">
     <!-- Claims — visible to all roles -->
     <a href="/"
-       class="flex items-center gap-3 {% if activePage == 'chat' %}bg-primary text-white{% else %}text-slate-400 hover:text-white hover:bg-white/10{% endif %} rounded-xl py-2.5 px-4 transition-all duration-200 font-inter text-sm font-medium">
-      <span class="material-symbols-outlined text-[20px]">description</span>
+       class="flex items-center gap-3 {% if activePage == 'chat' %}bg-[#1f2b49] text-[#62fae3] shadow-[0_0_15px_rgba(98,250,227,0.2)]{% else %}text-[#dee5ff] opacity-70 hover:opacity-100 hover:bg-surface-bright{% endif %} rounded-r-full py-3 px-6 transition-all duration-200 ease-in-out font-inter text-sm font-medium tracking-wide">
+      <span class="material-symbols-outlined">description</span>
       Claims
     </a>
     <!-- Reviewer-only pages -->
     {% if userRole == "reviewer" %}
     <a href="/manage"
-       class="flex items-center gap-3 {% if activePage == 'manage' %}bg-primary text-white{% else %}text-slate-400 hover:text-white hover:bg-white/10{% endif %} rounded-xl py-2.5 px-4 transition-all duration-200 font-inter text-sm font-medium">
-      <span class="material-symbols-outlined text-[20px]">checklist</span>
+       class="flex items-center gap-3 {% if activePage == 'manage' %}bg-[#1f2b49] text-[#62fae3] shadow-[0_0_15px_rgba(98,250,227,0.2)]{% else %}text-[#dee5ff] opacity-70 hover:opacity-100 hover:bg-surface-bright{% endif %} rounded-r-full py-3 px-6 transition-all duration-200 ease-in-out font-inter text-sm font-medium tracking-wide">
+      <span class="material-symbols-outlined">checklist</span>
       Manage
     </a>
     <a href="/analytics"
-       class="flex items-center gap-3 {% if activePage == 'analytics' %}bg-primary text-white{% else %}text-slate-400 hover:text-white hover:bg-white/10{% endif %} rounded-xl py-2.5 px-4 transition-all duration-200 font-inter text-sm font-medium">
-      <span class="material-symbols-outlined text-[20px]">monitoring</span>
+       class="flex items-center gap-3 {% if activePage == 'analytics' %}bg-[#1f2b49] text-[#62fae3] shadow-[0_0_15px_rgba(98,250,227,0.2)]{% else %}text-[#dee5ff] opacity-70 hover:opacity-100 hover:bg-surface-bright{% endif %} rounded-r-full py-3 px-6 transition-all duration-200 ease-in-out font-inter text-sm font-medium tracking-wide">
+      <span class="material-symbols-outlined">monitoring</span>
       Analytics
     </a>
     <a href="/policies"
-       class="flex items-center gap-3 {% if activePage == 'policies' %}bg-primary text-white{% else %}text-slate-400 hover:text-white hover:bg-white/10{% endif %} rounded-xl py-2.5 px-4 transition-all duration-200 font-inter text-sm font-medium">
-      <span class="material-symbols-outlined text-[20px]">policy</span>
+       class="flex items-center gap-3 {% if activePage == 'policies' %}bg-[#1f2b49] text-[#62fae3] shadow-[0_0_15px_rgba(98,250,227,0.2)]{% else %}text-[#dee5ff] opacity-70 hover:opacity-100 hover:bg-surface-bright{% endif %} rounded-r-full py-3 px-6 transition-all duration-200 ease-in-out font-inter text-sm font-medium tracking-wide">
+      <span class="material-symbols-outlined">policy</span>
       Policies
     </a>
     {% endif %}
@@ -115,7 +90,7 @@
     {% block content %}{% endblock %}
   </div>
   <!-- Footer -->
-  <footer class="shrink-0 flex items-center justify-between px-6 py-2 border-t border-outline-variant bg-surface-dim text-[10px] text-on-surface-variant/70">
+  <footer class="shrink-0 flex items-center justify-between px-6 py-2 border-t border-outline-variant/10 bg-[#060e20]/80 text-[10px] text-on-surface-variant/50">
     <span>Expense AI &middot; SUTD MSTR-DAIE &middot; Multimodal Agentic GenAI</span>
     <span>v{{ appVersion }} &middot; <a href="/health" class="hover:text-secondary transition-colors">System Health</a></span>
   </footer>
@@ -130,7 +105,7 @@
     var container = document.getElementById('errorToastContainer');
     if (!container) return;
     var toast = document.createElement('div');
-    toast.className = 'pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-lg border border-error/20 bg-white text-error animate-[slideUp_0.3s_ease-out]';
+    toast.className = 'pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] border border-error/30 bg-[#1a0a0e] text-error animate-[slideUp_0.3s_ease-out]';
     toast.innerHTML =
       '<span class="material-symbols-outlined text-lg flex-shrink-0 mt-0.5" style="font-variation-settings: \'FILL\' 1;">error</span>' +
       '<div class="flex-1 min-w-0">' +

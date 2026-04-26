@@ -12,19 +12,19 @@
     </div>
     <div class="flex items-center gap-3">
       {% if totalErrors > 0 %}
-      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-error/30 text-error text-sm font-bold">
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e0a0a] border border-error/30 text-error text-sm font-bold">
         <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">error</span>
         {{ totalErrors }} Error{{ "s" if totalErrors != 1 }}
       </span>
       {% endif %}
       {% if totalWarnings > 0 %}
-      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-300 text-amber-600 text-sm font-bold">
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#2e2a0a] border border-[#ffd700]/30 text-[#ffd700] text-sm font-bold">
         <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">warning</span>
         {{ totalWarnings }} Warning{{ "s" if totalWarnings != 1 }}
       </span>
       {% endif %}
       {% if totalErrors == 0 and totalWarnings == 0 %}
-      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-300 text-green-700 text-sm font-bold">
+      <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0a2e1a] border border-[#2dd881]/30 text-[#2dd881] text-sm font-bold">
         <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">check_circle</span>
         No Errors
       </span>
@@ -38,31 +38,31 @@
   <!-- Filter tabs -->
   <div x-data="{ filter: 'errors' }" class="space-y-4">
     <div class="flex gap-2">
-      <button @click="filter = 'errors'" :class="filter === 'errors' ? 'bg-error/20 text-error border-error/40' : 'bg-white text-on-surface-variant border-outline-variant hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+      <button @click="filter = 'errors'" :class="filter === 'errors' ? 'bg-error/20 text-error border-error/40' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
         Errors ({{ totalErrors }})
       </button>
-      <button @click="filter = 'warnings'" :class="filter === 'warnings' ? 'bg-amber-50 text-amber-500 border-amber-300' : 'bg-white text-on-surface-variant border-outline-variant hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+      <button @click="filter = 'warnings'" :class="filter === 'warnings' ? 'bg-[#ffd700]/10 text-[#ffd700] border-[#ffd700]/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
         Warnings ({{ totalWarnings }})
       </button>
-      <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-white text-on-surface-variant border-outline-variant hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
+      <button @click="filter = 'all'" :class="filter === 'all' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'" class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
         All Logs
       </button>
     </div>
 
     <!-- Service cards -->
     {% for service, data in logs.items() %}
-    <div class="rounded-2xl border border-outline-variant bg-white overflow-hidden"
+    <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] overflow-hidden"
          x-show="filter === 'all' || (filter === 'errors' && {{ data.errors | length }} > 0) || (filter === 'warnings' && {{ data.warnings | length }} > 0)">
 
       <!-- Service header -->
       <div x-data="{ open: {{ 'true' if data.errors | length > 0 else 'false' }} }" class="flex flex-col">
-        <button @click="open = !open" class="flex items-center gap-3 px-5 py-4 w-full text-left hover:bg-surface-dim transition-colors">
+        <button @click="open = !open" class="flex items-center gap-3 px-5 py-4 w-full text-left hover:bg-surface-bright/50 transition-colors">
           {% if data.errors | length > 0 %}
           <span class="w-2.5 h-2.5 rounded-full bg-error shadow-[0_0_8px_rgba(255,107,107,0.5)]"></span>
           {% elif data.warnings | length > 0 %}
-          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#ffd700] shadow-[0_0_8px_rgba(255,215,0,0.5)]"></span>
           {% else %}
-          <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-[#2dd881] shadow-[0_0_8px_rgba(45,216,129,0.5)]"></span>
           {% endif %}
           <span class="text-sm font-bold font-manrope text-on-surface flex-1">{{ data.label }}</span>
           <span class="text-xs text-on-surface-variant">
@@ -80,7 +80,7 @@
             <template x-if="filter === 'errors'">
               <div>
                 {% for entry in data.errors %}
-                <div class="px-5 py-3 border-b border-outline-variant/20 hover:bg-error/5 transition-colors">
+                <div class="px-5 py-3 border-b border-outline-variant/5 hover:bg-error/5 transition-colors">
                   <div class="flex items-start gap-3">
                     <span class="material-symbols-outlined text-error text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">error</span>
                     <div class="flex-1 min-w-0">
@@ -108,12 +108,12 @@
             <template x-if="filter === 'warnings'">
               <div>
                 {% for entry in data.warnings %}
-                <div class="px-5 py-3 border-b border-outline-variant/20 hover:bg-amber-50 transition-colors">
+                <div class="px-5 py-3 border-b border-outline-variant/5 hover:bg-[#ffd700]/5 transition-colors">
                   <div class="flex items-start gap-3">
-                    <span class="material-symbols-outlined text-amber-500 text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    <span class="material-symbols-outlined text-[#ffd700] text-sm mt-0.5" style="font-variation-settings: 'FILL' 1;">warning</span>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-widest text-amber-500/80">WARN</span>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-[#ffd700]/80">WARN</span>
                         {% if entry.funcName %}
                         <span class="text-[10px] text-on-surface-variant font-mono">{{ entry.loggerName }}.{{ entry.funcName }}</span>
                         {% endif %}
@@ -136,12 +136,12 @@
             <template x-if="filter === 'all'">
               <div>
                 {% for entry in data.entries[-50:] %}
-                <div class="px-5 py-2 border-b border-outline-variant/20 hover:bg-surface-dim transition-colors">
+                <div class="px-5 py-2 border-b border-outline-variant/5 hover:bg-surface-bright/30 transition-colors">
                   <div class="flex items-start gap-2">
                     {% if entry.level == "ERROR" %}
                     <span class="text-[10px] font-bold text-error w-10 shrink-0 mt-0.5">ERR</span>
                     {% elif entry.level == "WARNING" %}
-                    <span class="text-[10px] font-bold text-amber-500 w-10 shrink-0 mt-0.5">WARN</span>
+                    <span class="text-[10px] font-bold text-[#ffd700] w-10 shrink-0 mt-0.5">WARN</span>
                     {% else %}
                     <span class="text-[10px] font-bold text-on-surface-variant/40 w-10 shrink-0 mt-0.5">INFO</span>
                     {% endif %}
@@ -163,7 +163,7 @@
   </div>
 
   <!-- Links -->
-  <div class="rounded-2xl border border-outline-variant bg-white p-5">
+  <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] p-5">
     <dl class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
       <dt class="text-on-surface-variant">JSON Endpoint</dt>
       <dd><a href="/logs/json" class="text-secondary hover:underline">/logs/json</a></dd>

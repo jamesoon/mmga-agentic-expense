@@ -11,7 +11,7 @@
         <p class="text-on-surface-variant font-body">Claims performance and trend analysis.</p>
       </div>
       <a href="/dashboard"
-         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-all text-sm font-medium">
+         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/20 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright transition-all text-sm font-medium">
         <span class="material-symbols-outlined text-base">arrow_back</span>
         Back to Dashboard
       </a>
@@ -152,7 +152,7 @@
           <span class="text-[10px] text-on-surface-variant font-bold">{{ day.count }}</span>
           <div class="w-full rounded-t-lg bg-primary/60 hover:bg-primary transition-colors duration-200 relative group"
                style="height: {{ [((day.count / maxDailyCount) * 100) | int, 4] | max }}%;">
-            <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold py-0.5 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#1f2b49] text-[#dee5ff] text-[10px] font-bold py-0.5 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
               {{ day.count }}
             </div>
           </div>
@@ -183,7 +183,7 @@
           </thead>
           <tbody class="divide-y divide-outline-variant/5">
             {% for emp in topEmployees %}
-            <tr class="hover:bg-surface-dim transition-colors">
+            <tr class="hover:bg-surface-bright/30 transition-colors">
               <td class="py-3 pr-4 text-on-surface-variant text-sm">{{ loop.index }}</td>
               <td class="py-3 pr-4">
                 <p class="font-bold text-sm text-on-surface">{{ emp.displayName }}</p>
