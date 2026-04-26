@@ -36,6 +36,7 @@ services:
     volumes:
       - ./templates:/app/templates:ro
       - ./static:/app/static:ro
+      - ./scripts:/app/scripts:ro
       - ./uploads:/data/uploads
       - ./eval:/app/eval:ro
     mem_limit: 768m
@@ -99,7 +100,6 @@ services:
     build: ./mcp_servers/db
     environment:
       FASTMCP_HOST: 0.0.0.0
-      DATABASE_URL: postgresql://agentic:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/agentic_claims
     env_file:
       - .env.prod
     mem_limit: 384m
@@ -140,10 +140,6 @@ services:
     build: ./mcp_servers/email
     environment:
       FASTMCP_HOST: 0.0.0.0
-      SMTP_HOST: email-smtp.ap-southeast-1.amazonaws.com
-      SMTP_PORT: "587"
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
     env_file:
       - .env.prod
     mem_limit: 128m
