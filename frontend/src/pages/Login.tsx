@@ -14,96 +14,78 @@ export default function Login() {
     try {
       await login(username, password)
       navigate('/chat')
-    } catch {
-      // error is set in store
-    }
+    } catch { /* error in store */ }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg)' }}>
       <div
-        className="w-full max-w-sm rounded-xl border p-8 shadow-lg"
-        style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
+        className="w-full max-w-sm rounded-2xl p-8 shadow-sm"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
       >
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--fg)' }}>
-          Sign in
-        </h1>
-        <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
-          Expense Claims Portal
-        </p>
+        <div className="flex items-center gap-2 mb-7">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-white font-bold text-xs" style={{ background: 'var(--accent)' }}>
+            EC
+          </div>
+          <span className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>ExpenseClaims</span>
+        </div>
+
+        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--fg)' }}>Sign in</h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>Welcome back — enter your credentials to continue.</p>
 
         {error && (
-          <div
-            className="mb-4 rounded-lg px-3 py-2 text-sm border"
-            style={{ background: '#1f1215', borderColor: '#5c2025', color: 'var(--danger)' }}
-          >
-            {error}
+          <div className="mb-4 rounded-lg px-3.5 py-2.5 text-sm flex gap-2" style={{ background: 'var(--danger-light)', color: 'var(--danger)', border: '1px solid #fecaca' }}>
+            <span>⚠</span><span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--muted)' }}>
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoComplete="username"
-              className="w-full rounded-lg px-3 py-2.5 text-sm border outline-none transition-colors"
-              style={{
-                background: 'var(--bg)',
-                borderColor: 'var(--border)',
-                color: 'var(--fg)',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--muted)' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full rounded-lg px-3 py-2.5 text-sm border outline-none transition-colors"
-              style={{
-                background: 'var(--bg)',
-                borderColor: 'var(--border)',
-                color: 'var(--fg)',
-              }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
-            />
-          </div>
+          {[
+            { label: 'Username', type: 'text', value: username, setter: setUsername, autoComplete: 'username', placeholder: 'your_username' },
+            { label: 'Password', type: 'password', value: password, setter: setPassword, autoComplete: 'current-password', placeholder: '••••••••' },
+          ].map((field) => (
+            <div key={field.label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                  {field.label}
+                </label>
+                {field.label === 'Password' && (
+                  <Link to="/forgot-password" className="text-xs hover:underline" style={{ color: 'var(--accent)' }}>
+                    Forgot?
+                  </Link>
+                )}
+              </div>
+              <input
+                type={field.type}
+                value={field.value}
+                onChange={(e) => field.setter(e.target.value)}
+                required
+                autoComplete={field.autoComplete}
+                placeholder={field.placeholder}
+                className="w-full rounded-lg px-3.5 py-2.5 text-sm outline-none transition-all"
+                style={{ background: 'var(--surface-raised)', border: '1.5px solid var(--border)', color: 'var(--fg)' }}
+                onFocus={(e) => { e.target.style.borderColor = 'var(--accent)'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)' }}
+                onBlur={(e) => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none' }}
+              />
+            </div>
+          ))}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50 mt-1"
             style={{ background: 'var(--accent)' }}
+            onMouseEnter={(e) => { if (!loading) (e.target as HTMLElement).style.background = 'var(--accent-hover)' }}
+            onMouseLeave={(e) => { if (!loading) (e.target as HTMLElement).style.background = 'var(--accent)' }}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in →'}
           </button>
         </form>
 
-        <div className="mt-5 flex flex-col gap-2 text-sm text-center" style={{ color: 'var(--muted)' }}>
-          <Link to="/forgot-password" className="hover:underline" style={{ color: 'var(--accent)' }}>
-            Forgot password?
-          </Link>
-          <span>
-            No account?{' '}
-            <Link to="/signup" className="hover:underline" style={{ color: 'var(--accent)' }}>
-              Sign up
-            </Link>
-          </span>
-        </div>
+        <p className="text-xs text-center mt-5" style={{ color: 'var(--muted)' }}>
+          No account?{' '}
+          <Link to="/signup" className="font-medium hover:underline" style={{ color: 'var(--accent)' }}>Register</Link>
+        </p>
       </div>
     </div>
   )
