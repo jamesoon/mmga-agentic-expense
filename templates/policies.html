@@ -25,7 +25,7 @@
 
   <!-- Ingest status -->
   <div x-show="ingestMessage" x-transition
-       :class="ingestError ? 'bg-error/10 border-error/30 text-error' : 'bg-[#0a2e1a] border-[#2dd881]/30 text-[#2dd881]'"
+       :class="ingestError ? 'bg-error/10 border-error/30 text-error' : 'bg-green-50 border-green-300 text-green-700'"
        class="flex items-center gap-3 px-4 py-3 rounded-xl border text-sm">
     <span class="material-symbols-outlined text-base" x-text="ingestError ? 'error' : 'check_circle'" style="font-variation-settings: 'FILL' 1;"></span>
     <span x-text="ingestMessage"></span>
@@ -40,14 +40,14 @@
     <div class="flex gap-2 flex-wrap mb-6">
       <!-- Models tab (first) -->
       <button @click="activeTab = 'models'"
-              :class="activeTab === 'models' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'"
+              :class="activeTab === 'models' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-surface-variant text-on-surface-variant border-outline-variant hover:text-on-surface hover:bg-surface-container-high'"
               class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
         <span class="material-symbols-outlined text-sm align-middle mr-1">smart_toy</span>
         Models
       </button>
       {% for cat, label in categories.items() %}
       <button @click="activeTab = '{{ cat }}'"
-              :class="activeTab === '{{ cat }}' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-[#0c1a30] text-on-surface-variant border-outline-variant/20 hover:text-on-surface'"
+              :class="activeTab === '{{ cat }}' ? 'bg-secondary/10 text-secondary border-secondary/30' : 'bg-surface-variant text-on-surface-variant border-outline-variant hover:text-on-surface hover:bg-surface-container-high'"
               class="px-4 py-2 rounded-xl border text-sm font-medium transition-colors">
         {{ label }}
         {% if byCategory[cat] %}
@@ -59,20 +59,20 @@
 
     <!-- Models tab content -->
     <div x-show="activeTab === 'models'" x-data="modelsTab()" class="space-y-4">
-      <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] overflow-hidden">
-        <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant/10 bg-[#091328]">
+      <div class="rounded-2xl border border-outline-variant bg-white overflow-hidden shadow-sm">
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant bg-surface-dim">
           <span class="material-symbols-outlined text-sm text-secondary" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
           <span class="text-xs font-bold uppercase tracking-widest text-secondary">OpenRouter Model Configuration</span>
-          <span class="text-xs text-on-surface-variant/50 ml-auto">Changes apply to new chat sessions immediately</span>
+          <span class="text-xs text-on-surface-variant ml-auto">Changes apply to new chat sessions immediately</span>
         </div>
         <div class="px-5 py-5 space-y-5">
 
           <!-- LLM Model -->
           <div class="space-y-2">
-            <label class="text-sm font-semibold text-on-surface">Text LLM <span class="text-xs text-on-surface-variant/50 font-normal">(agent reasoning)</span></label>
+            <label class="text-sm font-semibold text-on-surface">Text LLM <span class="text-xs text-on-surface-variant font-normal">(agent reasoning)</span></label>
             <select x-model="llm"
-                    class="w-full bg-[#060e20] text-on-surface text-sm rounded-xl border border-outline-variant/20 px-4 py-3 focus:outline-none focus:border-secondary/50 appearance-none cursor-pointer"
-                    style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%239ca3af%22 d=%22M2 4l4 4 4-4%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                    class="w-full bg-surface-variant text-on-surface text-sm rounded-xl border border-outline-variant px-4 py-3 focus:outline-none focus:border-secondary/50 appearance-none cursor-pointer"
+                    style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%2364748b%22 d=%22M2 4l4 4 4-4%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
               {% for model in availableModels %}
               <option value="{{ model }}">{{ model }}</option>
               {% endfor %}
@@ -81,10 +81,10 @@
 
           <!-- VLM Model -->
           <div class="space-y-2">
-            <label class="text-sm font-semibold text-on-surface">Vision LLM <span class="text-xs text-on-surface-variant/50 font-normal">(receipt extraction)</span></label>
+            <label class="text-sm font-semibold text-on-surface">Vision LLM <span class="text-xs text-on-surface-variant font-normal">(receipt extraction)</span></label>
             <select x-model="vlm"
-                    class="w-full bg-[#060e20] text-on-surface text-sm rounded-xl border border-outline-variant/20 px-4 py-3 focus:outline-none focus:border-secondary/50 appearance-none cursor-pointer"
-                    style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%239ca3af%22 d=%22M2 4l4 4 4-4%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                    class="w-full bg-surface-variant text-on-surface text-sm rounded-xl border border-outline-variant px-4 py-3 focus:outline-none focus:border-secondary/50 appearance-none cursor-pointer"
+                    style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%2364748b%22 d=%22M2 4l4 4 4-4%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
               {% for model in availableModels %}
               <option value="{{ model }}">{{ model }}</option>
               {% endfor %}
@@ -93,7 +93,7 @@
 
           <!-- Status message -->
           <div x-show="statusMsg" x-transition
-               :class="statusError ? 'bg-error/10 border-error/30 text-error' : 'bg-[#0a2e1a] border-[#2dd881]/30 text-[#2dd881]'"
+               :class="statusError ? 'bg-error/10 border-error/30 text-error' : 'bg-green-50 border-green-300 text-green-700'"
                class="flex items-center gap-3 px-4 py-3 rounded-xl border text-sm">
             <span class="material-symbols-outlined text-base" x-text="statusError ? 'error' : 'check_circle'" style="font-variation-settings: 'FILL' 1;"></span>
             <span x-text="statusMsg"></span>
@@ -117,14 +117,14 @@
     <div x-show="activeTab === '{{ cat }}'" class="space-y-4">
 
       <!-- System section (read-only) -->
-      <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] overflow-hidden">
-        <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant/10 bg-[#091328]">
-          <span class="material-symbols-outlined text-sm text-[#ffd700]" style="font-variation-settings: 'FILL' 1;">lock</span>
-          <span class="text-xs font-bold uppercase tracking-widest text-[#ffd700]">System Rules</span>
-          <span class="text-xs text-on-surface-variant/50 ml-auto">Read-only · Cannot be edited via UI</span>
+      <div class="rounded-2xl border border-outline-variant bg-white overflow-hidden shadow-sm">
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant bg-amber-50">
+          <span class="material-symbols-outlined text-sm text-amber-600" style="font-variation-settings: 'FILL' 1;">lock</span>
+          <span class="text-xs font-bold uppercase tracking-widest text-amber-600">System Rules</span>
+          <span class="text-xs text-on-surface-variant ml-auto">Read-only · Cannot be edited via UI</span>
         </div>
         <div class="px-5 py-4">
-          <pre class="text-xs text-on-surface/60 font-mono whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">{{ systemPolicies.get(cat, '') }}</pre>
+          <pre class="text-xs text-on-surface font-mono whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto bg-surface-dim rounded-xl p-3">{{ systemPolicies.get(cat, '') }}</pre>
         </div>
       </div>
 
@@ -134,15 +134,15 @@
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-sm text-secondary">edit_note</span>
           <span class="text-xs font-bold uppercase tracking-widest text-secondary">User-Editable Sections</span>
-          <span class="text-xs text-on-surface-variant/50 ml-auto">Changes take effect after re-ingestion</span>
+          <span class="text-xs text-on-surface-variant ml-auto">Changes take effect after re-ingestion</span>
         </div>
 
         {% for section in byCategory[cat] %}
-        <div class="rounded-2xl border border-secondary/20 bg-[#0c1a30] overflow-hidden">
-          <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant/10">
+        <div class="rounded-2xl border border-outline-variant bg-white overflow-hidden shadow-sm">
+          <div class="flex items-center gap-3 px-5 py-3 border-b border-outline-variant bg-surface-dim">
             <span class="material-symbols-outlined text-sm text-secondary">edit</span>
             <span class="text-sm font-bold text-on-surface">{{ section.title }}</span>
-            <span class="text-xs text-on-surface-variant/50 ml-auto font-mono">{{ section.section_key }}</span>
+            <span class="text-xs text-on-surface-variant ml-auto font-mono">{{ section.section_key }}</span>
           </div>
           <form hx-post="/policies/section/{{ section.id }}"
                 hx-target="#save-status-{{ section.id }}"
@@ -150,9 +150,9 @@
                 class="p-5 space-y-3">
             <textarea name="content"
                       rows="12"
-                      class="w-full bg-[#060e20] text-on-surface text-xs font-mono rounded-xl border border-outline-variant/20 p-3 focus:outline-none focus:border-secondary/50 resize-y leading-relaxed">{{ section.content }}</textarea>
+                      class="w-full bg-surface-variant text-on-surface text-xs font-mono rounded-xl border border-outline-variant p-3 focus:outline-none focus:border-secondary/50 resize-y leading-relaxed">{{ section.content }}</textarea>
             <div class="flex items-center justify-between">
-              <div class="text-xs text-on-surface-variant/40">
+              <div class="text-xs text-on-surface-variant">
                 Last updated: {{ section.updated_at.strftime('%Y-%m-%d %H:%M UTC') if section.updated_at else '—' }}
                 by {{ section.updated_by }}
               </div>
@@ -170,7 +170,7 @@
       </div>
 
       {% else %}
-      <div class="rounded-2xl border border-outline-variant/20 bg-[#0c1a30] px-5 py-8 text-center text-on-surface-variant text-sm">
+      <div class="rounded-2xl border border-outline-variant bg-surface-dim px-5 py-8 text-center text-on-surface-variant text-sm">
         No user-editable sections for this category.
       </div>
       {% endif %}
