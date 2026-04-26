@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     # Session configuration
     session_secret_key: str = Field(..., description="Secret key for signing session cookies")
 
+    # AWS Cognito configuration
+    cognito_user_pool_id: str = Field(default="ap-southeast-1_np4A4xyfA", description="Cognito User Pool ID")
+    cognito_client_id: str = Field(default="69lsr7uqfdagtp83v8n3h57gmk", description="Cognito App Client ID")
+    cognito_region: str = Field(default="ap-southeast-1", description="AWS region for Cognito")
+
     # Streaming configuration
     enable_response_streaming: bool = Field(default=False, description="Enable token-level response streaming in chat")
 

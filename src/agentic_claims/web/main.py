@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import JSONResponse, RedirectResponse
@@ -14,6 +15,7 @@ from agentic_claims.core.config import getSettings
 from agentic_claims.core.graph import getCompiledGraph
 from agentic_claims.core.logging import setupLogging
 from agentic_claims.eval_worker.orchestrator import EvalOrchestrator
+from agentic_claims.web.middleware.cognitoAuth import CognitoAuthMiddleware
 from agentic_claims.web.middleware.publicRateLimit import PublicRateLimitMiddleware
 from agentic_claims.web.middleware.requestGuard import RequestGuardMiddleware
 from agentic_claims.web.routers.analytics import router as analyticsRouter
@@ -31,11 +33,9 @@ from agentic_claims.web.routers.review import router as reviewRouter
 
 logger = logging.getLogger(__name__)
 
-# Paths that do not require authentication
+# Legacy path constants kept for RequestGuardMiddleware reference
 _PUBLIC_PATHS = {"/login", "/logout", "/llmasjudge", "/architecture"}
 _PUBLIC_PREFIXES = ("/static/", "/llmasjudge/", "/architecture/")
-# API/SSE paths return 401 JSON instead of 302 redirect (prevents EventSource loops)
-_API_PREFIXES = ("/chat/", "/api/")
 
 
 def _findProjectRoot() -> Path:
@@ -106,41 +106,40 @@ class RememberMeMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class AuthMiddleware(BaseHTTPMiddleware):
-    """Redirect unauthenticated requests to /login.
-
-    Exempts /login, /logout, and /static/* paths.
-    Requires SessionMiddleware to have run first (must be added AFTER this one).
-    """
-
-    async def dispatch(self, request: Request, callNext):
-        path = request.url.path
-        if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
-            return await callNext(request)
-        if not request.session.get("user_id"):
-            # Return 401 for API/SSE paths to prevent EventSource redirect loops
-            if any(path.startswith(p) for p in _API_PREFIXES):
-                return JSONResponse(
-                    {"detail": "Not authenticated"}, status_code=401
-                )
-            return RedirectResponse("/login", status_code=302)
-        return await callNext(request)
-
 
 app = FastAPI(title="Cognitive Atelier", lifespan=lifespan)
 
+# CORS — allow React SPA origin (CloudFront / localhost dev)
+_allowedOrigins = [
+    "https://mmga.mdaie-sutd.fit",
+    "http://localhost:5173",   # Vite dev server
+    "http://localhost:3000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowedOrigins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key"],
+)
+
 # Middleware LIFO order (last added = outermost = runs first on request):
-#   RememberMeMiddleware (outermost) — patches Set-Cookie Max-Age on responses
-#   AuthMiddleware — redirects unauthenticated requests
-#   SessionMiddleware (innermost) — signs/reads session cookie
-app.add_middleware(AuthMiddleware)
+#   CognitoAuthMiddleware — validates Cognito JWT; falls back to session (transition window)
+#   RememberMeMiddleware — patches Set-Cookie Max-Age on responses
+#   SessionMiddleware (innermost) — signs/reads legacy session cookie
+app.add_middleware(
+    CognitoAuthMiddleware,
+    userPoolId=settings.cognito_user_pool_id,
+    region=settings.cognito_region,
+    clientId=settings.cognito_client_id,
+)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.session_secret_key,
     session_cookie=_SESSION_COOKIE,
     max_age=None,
     same_site="lax",
-    https_only=False,
+    https_only=settings.app_env == "prod",
 )
 app.add_middleware(RememberMeMiddleware)
 app.add_middleware(RequestGuardMiddleware, settings=settings)

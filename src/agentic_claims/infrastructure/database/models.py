@@ -193,6 +193,9 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(
         String(255), nullable=True, name="email"
     )
+    cognitoSub: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True, index=True, name="cognito_sub"
+    )
 
 
 class UserQuotaUsage(Base):
