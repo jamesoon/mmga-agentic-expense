@@ -43,7 +43,7 @@ async def sendEmailViaSmtp(to: str, subject: str, body: str) -> dict[str, Any]:
             port=SMTP_PORT,
             username=SMTP_USER if SMTP_USER else None,
             password=SMTP_PASSWORD if SMTP_PASSWORD else None,
-            start_tls=False,  # Adjust based on SMTP server requirements
+            start_tls=SMTP_PORT == 587,
         )
 
         messageId = message["Message-ID"] if "Message-ID" in message else f"<{uuid.uuid4()}@smtp>"

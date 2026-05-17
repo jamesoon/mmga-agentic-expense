@@ -69,7 +69,7 @@ rsync -avz --delete \
   --exclude 'reference-code' \
   --exclude 'project-reports' \
   --exclude 'project-rubrics' \
-  --exclude 'eval' \
+  --exclude 'eval/results' \
   --exclude 'poetry.lock' \
   --exclude '.env.local' \
   --exclude '.env.prod.example' \

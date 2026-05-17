@@ -89,7 +89,13 @@
                 <img src="/api/review/{{ claim.id }}/receipt-image"
                      alt="Receipt"
                      :style="'transform: scale(' + scale + '); transform-origin: top center; transition: transform 0.15s ease;'"
-                     class="max-h-full w-auto shadow-2xl rounded-sm" />
+                     class="max-h-full w-auto shadow-2xl rounded-sm"
+                     id="receiptImg-{{ claim.id }}"
+                     onerror="this.style.display='none';document.getElementById('receiptFallback-{{ claim.id }}').style.display='flex';" />
+                <div id="receiptFallback-{{ claim.id }}" style="display:none" class="flex-col items-center justify-center gap-2 text-on-surface-variant/30">
+                  <span class="material-symbols-outlined text-4xl">receipt_long</span>
+                  <p class="text-xs">Receipt image unavailable.</p>
+                </div>
               {% else %}
                 <div class="flex flex-col items-center justify-center gap-2 text-on-surface-variant/30">
                   <span class="material-symbols-outlined text-4xl">receipt_long</span>

@@ -147,25 +147,96 @@
     });
   }
 
+  function setStatus(text, isError) {
+    let el = document.getElementById('runEvalStatus');
+    if (!el) {
+      const btn = document.getElementById('runEvalBtn');
+      if (!btn || !btn.parentNode) return;
+      el = document.createElement('div');
+      el.id = 'runEvalStatus';
+      el.className = 'text-xs mt-2';
+      btn.parentNode.appendChild(el);
+    }
+    el.textContent = text || '';
+    el.style.color = isError ? '#f87171' : '';
+  }
+
   function bindRunButton() {
     const btn = document.getElementById('runEvalBtn');
     if (!btn) return;
     btn.addEventListener('click', async function () {
       btn.disabled = true;
+      setStatus('Queuing eval run…', false);
       try {
         const r = await fetch('/llmasjudge/run', { method: 'POST' });
-        let payload = {};
+        let payload = null;
         try { payload = await r.json(); } catch (_e) {}
-        alert(payload && payload.error ? payload.error : ('run queued: id=' + (payload.runId || '?')));
+        if (!r.ok) {
+          const bodyText = payload && payload.error
+            ? payload.error
+            : ('HTTP ' + r.status + (r.status === 429 ? ' — rate limit (1/hour). Wait and retry.' : ''));
+          setStatus('Failed: ' + bodyText, true);
+          return;
+        }
+        setStatus('Queued: runId=' + (payload && payload.runId) + ' — refreshing runs in 5s…', false);
+        setTimeout(function () { renderRuns(); renderOverview(); }, 5000);
+      } catch (e) {
+        setStatus('Network error: ' + e.message, true);
       } finally {
         btn.disabled = false;
       }
     });
   }
 
+  async function renderRuns() {
+    const el = document.getElementById('runsContainer');
+    if (!el) return;
+    const data = await fetchJson('/llmasjudge/runs');
+    clearChildren(el);
+    const records = (data && data.records) || [];
+    if (records.length === 0) {
+      el.appendChild(mkEl('div', 'text-sm text-on-surface-variant', 'No runs yet.'));
+      return;
+    }
+    const table = document.createElement('table');
+    table.className = 'w-full text-sm';
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['ID', 'Started', 'Finished', 'Status', 'Judge', 'Summary'].forEach(function (h) {
+      headRow.appendChild(mkEl('th', 'text-left py-1 pr-3 text-xs uppercase tracking-widest text-on-surface-variant', h));
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    for (const r of records) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-t border-outline-variant/20';
+      const summary = r.summary_json || {};
+      let summaryText = '';
+      if (summary.error) {
+        summaryText = 'error: ' + String(summary.error).slice(0, 80) + '…';
+      } else if (typeof summary.agenticPct !== 'undefined') {
+        summaryText = 'agentic ' + (100 * summary.agenticPct).toFixed(1) + '%';
+      }
+      const cells = [
+        r.id,
+        r.started_at ? r.started_at.replace('T', ' ').slice(0, 19) : '—',
+        r.finished_at ? r.finished_at.replace('T', ' ').slice(0, 19) : '—',
+        r.status,
+        r.judge_model || '—',
+        summaryText,
+      ];
+      for (const c of cells) tr.appendChild(mkEl('td', 'py-1 pr-3', c));
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    el.appendChild(table);
+  }
+
   renderOverview();
   renderBenchmarkChart();
   renderDisagreement();
+  renderRuns();
   bindPlaygroundForm();
   bindRunButton();
 })();

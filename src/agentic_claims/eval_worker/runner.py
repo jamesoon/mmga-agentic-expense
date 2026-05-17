@@ -78,11 +78,12 @@ async def _updateRunStatus(runId: int, status: str, *, summary: dict[str, Any] |
         params: dict[str, Any] = {"id": runId, "status": status}
         if summary is not None:
             params["summary"] = json.dumps(summary)
+            isTerminal = status in ("finished", "failed", "interrupted")
+            params["is_terminal"] = isTerminal
             await session.execute(text(
                 "UPDATE eval_runs SET status=:status, "
                 "summary_json=cast(:summary as jsonb), "
-                "finished_at=CASE WHEN :status IN ('finished','failed','interrupted') "
-                "                 THEN now() ELSE finished_at END "
+                "finished_at=CASE WHEN :is_terminal THEN now() ELSE finished_at END "
                 "WHERE id=:id"
             ), params)
         else:

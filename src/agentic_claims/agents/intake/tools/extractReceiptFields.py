@@ -1,11 +1,14 @@
 """VLM receipt extraction tool with image quality gate."""
 
 import base64
+import io
 import json
 import logging
 import time
 
+import cv2
 import httpx
+import numpy as np
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from langchain_openrouter import ChatOpenRouter
@@ -18,6 +21,39 @@ from agentic_claims.core.imageStore import getImage, getImagePath
 from agentic_claims.core.logging import logEvent
 
 logger = logging.getLogger(__name__)
+
+_VLM_MAX_SIDE = 1024   # px — longer edge cap before sending to VLM
+_VLM_MAX_BYTES = 200_000  # 200 KB target after compression
+
+
+def _compressForVlm(imageBytes: bytes) -> tuple[bytes, str]:
+    """Resize and compress receipt image to reduce OpenRouter upload time.
+
+    Returns (compressedBytes, logSummary).
+    Caps the longer edge at 1024px and JPEG-compresses to ≤200 KB.
+    """
+    arr = np.frombuffer(imageBytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return imageBytes, "decode_failed"
+
+    h, w = img.shape[:2]
+    maxSide = max(h, w)
+    if maxSide > _VLM_MAX_SIDE:
+        scale = _VLM_MAX_SIDE / maxSide
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+    quality = 85
+    while quality >= 50:
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not ok:
+            break
+        compressed = buf.tobytes()
+        if len(compressed) <= _VLM_MAX_BYTES:
+            return compressed, f"{len(imageBytes)//1024}KB→{len(compressed)//1024}KB q={quality}"
+        quality -= 10
+
+    return buf.tobytes(), f"{len(imageBytes)//1024}KB→{len(buf.tobytes())//1024}KB q={quality}"
 
 
 @tool
@@ -45,40 +81,35 @@ async def extractReceiptFields(claimId: str) -> dict:
         # Decode base64 to bytes
         imageBytes = base64.b64decode(imageB64)
 
-        # Step 1: Check image quality
-        # Disabled: always continue to VLM extraction even for low-resolution or blurry images.
-        # qualityCheck = checkImageQuality(
-        #     imageBytes=imageBytes,
-        #     threshold=settings.image_quality_threshold,
-        #     minWidth=settings.image_min_width,
-        #     minHeight=settings.image_min_height,
-        # )
-        #
-        # if not qualityCheck["acceptable"]:
-        #     return {
-        #         "error": f"Image quality check failed: {qualityCheck['reason']}. Please upload a clearer, higher-resolution image."
-        #     }
-        #
-        # logger.info(
-        #     "extractReceiptFields quality check passed",
-        #     extra={
-        #         "elapsed": f"{time.time() - toolStart:.2f}s",
-        #         "qualityScore": qualityCheck.get("score"),
-        #     },
-        # )
+        # Compress image before sending to VLM — reduces upload payload from ~3MB to ~100KB
+        compressedBytes, compressLog = _compressForVlm(imageBytes)
+        imageB64 = base64.b64encode(compressedBytes).decode("utf-8")
+        logEvent(
+            logger,
+            "tool.extractReceiptFields.image_compressed",
+            logCategory="tool",
+            toolName="extractReceiptFields",
+            claimId=claimId,
+            compression=compressLog,
+        )
 
         # Step 3: Instantiate VLM using ChatOpenRouter
+        # model_kwargs injects provider routing into every request body sent to OpenRouter:
+        # sort=throughput → fastest available provider; allow_fallbacks → tries others if slow
         vlm = ChatOpenRouter(
             model=settings.openrouter_model_vlm,
             openrouter_api_key=settings.openrouter_api_key,
             temperature=0.0,
             max_tokens=settings.openrouter_vlm_max_tokens,
+            model_kwargs={"provider": {"sort": "throughput", "allow_fallbacks": True}},
         )
 
+        VLM_TIMEOUT = httpx.Timeout(connect=10.0, read=90.0, write=30.0, pool=5.0)
+
         # Bypass SSL verification (Zscaler corporate proxy workaround)
-        vlm.client.sdk_configuration.client = httpx.Client(verify=False, follow_redirects=True)
+        vlm.client.sdk_configuration.client = httpx.Client(verify=False, follow_redirects=True, timeout=VLM_TIMEOUT)
         vlm.client.sdk_configuration.async_client = httpx.AsyncClient(
-            verify=False, follow_redirects=True
+            verify=False, follow_redirects=True, timeout=VLM_TIMEOUT
         )
 
         # Step 4: Build multimodal message with prompt + image (sent directly to VLM, not through LLM)
@@ -97,6 +128,17 @@ async def extractReceiptFields(claimId: str) -> dict:
             response = await vlm.ainvoke([message])
         except Exception as e:
             errorStr = str(e)
+            logEvent(
+                logger,
+                "tool.extractReceiptFields.vlm_error",
+                level=logging.WARNING,
+                logCategory="tool",
+                toolName="extractReceiptFields",
+                claimId=claimId,
+                model=settings.openrouter_model_vlm,
+                errorType=type(e).__name__,
+                error=errorStr[:300],
+            )
             # Check for 402 payment/quota errors
             if "402" in errorStr or "credits" in errorStr.lower() or "quota" in errorStr.lower():
                 logEvent(
@@ -116,13 +158,13 @@ async def extractReceiptFields(claimId: str) -> dict:
                     openrouter_api_key=settings.openrouter_api_key,
                     temperature=0.0,
                     max_tokens=settings.openrouter_vlm_max_tokens,
+                    model_kwargs={"provider": {"sort": "throughput", "allow_fallbacks": True}},
                 )
-                # Bypass SSL verification (Zscaler corporate proxy workaround)
                 fallbackVlm.client.sdk_configuration.client = httpx.Client(
-                    verify=False, follow_redirects=True
+                    verify=False, follow_redirects=True, timeout=VLM_TIMEOUT
                 )
                 fallbackVlm.client.sdk_configuration.async_client = httpx.AsyncClient(
-                    verify=False, follow_redirects=True
+                    verify=False, follow_redirects=True, timeout=VLM_TIMEOUT
                 )
                 response = await fallbackVlm.ainvoke([message])
             else:
@@ -138,6 +180,14 @@ async def extractReceiptFields(claimId: str) -> dict:
         )
 
         rawContent = response.content.strip()
+
+        # VLM returned nothing — image is not a receipt or model refused silently
+        if not rawContent:
+            return {
+                "notAReceipt": True,
+                "error": "The image does not appear to contain an expense receipt. Please upload a clear photo of a receipt.",
+            }
+
         if rawContent.startswith("```"):
             # Remove opening ```json or ``` and closing ```
             lines = rawContent.split("\n")
@@ -173,8 +223,23 @@ async def extractReceiptFields(claimId: str) -> dict:
             extractedReceiptVar.set(result)
 
             return result
-        except json.JSONDecodeError as e:
-            return {"error": f"Failed to parse VLM response as JSON: {str(e)}"}
+        except json.JSONDecodeError:
+            # VLM replied in plain text — likely a refusal for non-receipt images
+            return {
+                "notAReceipt": True,
+                "vlmReply": rawContent[:300],
+                "error": "The image does not appear to contain an expense receipt. Please upload a clear photo of a receipt.",
+            }
 
     except Exception as e:
-        return {"error": f"Extraction failed: {str(e)}"}
+        logEvent(
+            logger,
+            "tool.extractReceiptFields.exception",
+            level=logging.ERROR,
+            logCategory="tool",
+            toolName="extractReceiptFields",
+            claimId=claimId,
+            errorType=type(e).__name__,
+            error=str(e)[:300],
+        )
+        return {"error": f"Extraction failed: {type(e).__name__}: {str(e)[:200]}"}
